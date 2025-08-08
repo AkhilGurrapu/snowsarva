@@ -1,0 +1,10 @@
+definition_version: 1.1
+native_app:
+  name: snowsarva_app
+  artifacts:
+    - app/manifest.yml
+    - app/setup.sql
+    - app/service-spec.yaml  
+    - app/readme.md
+  package:
+    name: snowsarva_app_pkg

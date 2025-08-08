@@ -26,6 +26,7 @@ I have this repository, take this repo "https://github.com/Snowflake-Labs/sfguid
 
 where ask to user these mcp for relevant and maily snowflake cortex to get any information on snowflake as well we have docs folder that needed about snowflake native app and snowflake. the list of mcp we have - ""github, context7, sequential-thinking, playwright.""
 
+Only use docs folder if needed, Use sub agents for frontend and backend if needed any other things we are doing with mcp sub agents specific to every use case and use
 
 Snowsarva - for data discoverability/trace/metrics/data catalog/observability
 Data tagging, Classification, Roles, Lineage, ETL/ELT with DBT, testing anomoly detection

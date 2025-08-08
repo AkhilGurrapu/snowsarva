@@ -1,4 +1,4 @@
-# cmd - snow --config-file="config.toml" connection test -c test
+# cmd - snow --config-file="config.toml" connection test -c snowsarva
 
 [connections.snowsarva]
 account = "CHFWNRV-DDB48976"

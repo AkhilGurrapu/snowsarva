@@ -1,0 +1,55 @@
+manifest_version: 1
+
+version:
+  name: V1_0_2
+  label: "Snowsarva v1.0.2"
+  comment: "Data Observability and Cost Management Native App"
+
+artifacts:
+  readme: readme.md
+  setup_script: setup.sql
+  container_services:
+    images:
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo/snowsarva_backend:1.0.0
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo/snowsarva_frontend:1.0.0
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo/snowsarva_router:1.0.0
+
+privileges:
+  - CREATE COMPUTE POOL:
+      description: "Enable creation of compute pools for container services"
+  - BIND SERVICE ENDPOINT:
+      description: "Enable external access to application endpoints"
+  - CREATE WAREHOUSE:
+      description: "Enable creation of warehouses for data processing"
+  - EXECUTE TASK:
+      description: "Enable execution of scheduled data processing tasks"
+
+references:
+  - ACCOUNT_USAGE_VIEWS:
+      label: "Account Usage Data Access"
+      description: "Access to QUERY_HISTORY, ACCESS_HISTORY, and usage views for lineage analysis"
+      privileges:
+        - SELECT
+      object_type: VIEW
+      multi_valued: true
+      register_callback: config.register_account_usage_callback
+  - ORGANIZATION_USAGE_VIEWS:
+      label: "Organization Usage Data Access" 
+      description: "Access to organization-level usage data for cost analysis"
+      privileges:
+        - SELECT
+      object_type: VIEW
+      multi_valued: true
+      register_callback: config.register_organization_usage_callback
+  - INFORMATION_SCHEMA_VIEWS:
+      label: "Information Schema Access"
+      description: "Access to metadata views for schema analysis"
+      privileges:
+        - SELECT
+      object_type: VIEW
+      multi_valued: true
+      register_callback: config.register_information_schema_callback
+
+configuration:
+  trace_level: OFF
+  log_level: INFO
