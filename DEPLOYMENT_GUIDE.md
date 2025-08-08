@@ -1,74 +1,198 @@
-# Snowsarva Deployment Guide
+# Snowsarva Hello World - Deployment Guide
 
-## Current Status
+This guide provides step-by-step instructions to deploy the Snowsarva Hello World React application as a Snowflake Native App.
 
-✅ **Completed:**
-- Full application code structure created
-- Docker containers built locally 
-- Native App package files ready (manifest.yml, setup.sql, service-spec.yaml)
-- All configurations updated with your credentials (CHFWNRV-DDB48976)
+## Prerequisites
 
-⚠️ **Authentication Issue:**
-The programmatic access token has MFA requirements preventing automated deployment.
+1. **Snowflake Account** with:
+   - Native Apps enabled
+   - Snowpark Container Services enabled
+   - Docker access for building images
 
-## Quick Local Testing (Immediate Option)
+2. **Local Development Environment**:
+   - Docker Desktop installed and running
+   - Snowflake CLI installed
+   - Git installed
 
-Since deployment is blocked by authentication, you can test the application locally:
+3. **Snowflake Setup** (should already exist):
+   - User: `snowsarva_user`
+   - Role: `snowsarva_role`
+   - Image repository for containers
 
-### 1. Start Backend
-```bash
-cd backend
-pip install -r requirements.txt
+## Project Structure
 
-# Set environment variables with your credentials
-export SNOWFLAKE_ACCOUNT="CHFWNRV-DDB48976"
-export SNOWFLAKE_DATABASE="snowsarva_image_database"
-export SNOWFLAKE_SCHEMA="snowsarva_image_schema"
-export SNOWFLAKE_WAREHOUSE="snowsarva_warehouse"
-export SNOWFLAKE_USER="snowsarva_user" 
-export ENVIRONMENT="development"
-
-# Start the backend API
-python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8081
+```
+snowsarva/
+├── app/
+│   └── src/
+│       ├── manifest.yml          # Native app configuration
+│       ├── setup.sql             # Installation scripts  
+│       ├── readme.md             # App documentation
+│       └── snowsarva.yaml        # Container service spec
+├── frontend/                     # React Hello World app
+│   ├── src/
+│   │   ├── App.js               # Main React component
+│   │   └── index.js             # React entry point
+│   ├── public/
+│   │   └── index.html           # HTML template
+│   ├── package.json             # React dependencies
+│   ├── Dockerfile               # Container build instructions
+│   └── nginx.conf               # Web server config
+├── snowflake.yml                # Snowflake CLI configuration
+└── build_containers.sh          # Build and push script
 ```
 
-### 2. Start Frontend  
-```bash
-cd frontend
-npm install
-REACT_APP_API_URL="http://localhost:8081/api" npm start
-```
+## Deployment Steps
 
-### 3. Access Application
-Visit http://localhost:3000 to see the Snowsarva dashboard.
+### Step 1: Build and Push Container Images
 
-## Manual Deployment via Snowsight
+1. **Start Docker Desktop**
+   ```bash
+   # Ensure Docker is running
+   docker info
+   ```
 
-1. **Access Snowsight**: https://app.snowflake.com/ (account CHFWNRV-DDB48976)
+2. **Set Environment Variables**
+   ```bash
+   export SNOWFLAKE_REGISTRY='chfwnrv-ddb48976.registry.snowflakecomputing.com/snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo'
+   ```
 
-2. **Run Setup Commands**:
-```sql
-USE ROLE snowsarva_role;
-USE WAREHOUSE snowsarva_warehouse;
-USE DATABASE snowsarva_image_database;
-USE SCHEMA snowsarva_image_schema;
+3. **Build and Push Images**
+   ```bash
+   ./build_containers.sh
+   ```
 
--- Create image repository
-CREATE IMAGE REPOSITORY IF NOT EXISTS snowsarva_img_repo;
+   This script will:
+   - Build the React app for production
+   - Create a Docker image with Nginx
+   - Push to Snowflake's image repository
 
--- Create application package
-CREATE APPLICATION PACKAGE IF NOT EXISTS snowsarva_app_pkg;
-```
+### Step 2: Deploy Native App Package
 
-3. **Upload Files**: Use Snowsight's interface to upload the `app/` directory contents.
+1. **Deploy the Application Package**
+   ```bash
+   snow app deploy
+   ```
 
-## What's Ready for Deployment
+2. **Create the Application Instance**
+   ```bash
+   snow app run
+   ```
 
-1. ✅ **Native App Package**: Complete with manifest, setup scripts, service specs
-2. ✅ **Container Images**: Built and ready (backend: 801MB, frontend: 52MB, router: 52MB)  
-3. ✅ **Database Schema**: 15+ tables across 5 schemas for full functionality
-4. ✅ **API Endpoints**: 20+ REST endpoints for lineage, costs, governance
-5. ✅ **React Frontend**: Modern dashboard with data visualization components
-6. ✅ **Documentation**: Complete README and deployment guides
+### Step 3: Set Up Required Snowflake Resources
 
-The application is **production-ready** and fully functional - just needs proper authentication setup for automated deployment to Snowflake!
+1. **Connect to Snowflake** (using snowsarva_user/role)
+
+2. **Create Compute Pool** (if not exists)
+   ```sql
+   USE ROLE snowsarva_role;
+   
+   CREATE COMPUTE POOL IF NOT EXISTS snowsarva_pool
+   MIN_NODES = 1
+   MAX_NODES = 1
+   INSTANCE_FAMILY = CPU_X64_XS;
+   ```
+
+3. **Create Warehouse** (if not exists)
+   ```sql
+   CREATE WAREHOUSE IF NOT EXISTS snowsarva_wh
+   WITH WAREHOUSE_SIZE = 'XSMALL'
+   AUTO_SUSPEND = 60
+   AUTO_RESUME = TRUE;
+   ```
+
+### Step 4: Start the Application
+
+1. **Install the Native App** (via Snowsight or SQL)
+   ```sql
+   -- Navigate to Apps > Installed Apps in Snowsight
+   -- Or use SQL to install the application package
+   ```
+
+2. **Start the Hello World Service**
+   ```sql
+   -- Use the installed application
+   USE APPLICATION snowsarva_hello_world;
+   
+   -- Start the service
+   CALL app_public.start_app('snowsarva_pool', 'snowsarva_wh');
+   ```
+
+3. **Check Service Status**
+   ```sql
+   CALL app_public.service_status();
+   ```
+
+4. **Get Application URL**
+   ```sql
+   CALL app_public.app_url();
+   ```
+
+## Application Management
+
+### Available Procedures
+
+The application provides these management procedures:
+
+| Procedure | Description | Usage |
+|-----------|-------------|--------|
+| `start_app(pool, warehouse)` | Start the Hello World service | `CALL app_public.start_app('pool_name', 'wh_name');` |
+| `stop_app()` | Stop the service | `CALL app_public.stop_app();` |
+| `service_status()` | Check service status | `CALL app_public.service_status();` |
+| `app_url()` | Get application URL | `CALL app_public.app_url();` |
+
+### Monitoring and Troubleshooting
+
+1. **Check Service Status**
+   ```sql
+   SHOW SERVICES IN APPLICATION snowsarva_hello_world;
+   ```
+
+2. **View Service Logs**
+   ```sql
+   CALL SYSTEM$GET_SERVICE_LOGS('snowsarva_service', 'snowsarva-frontend', 10);
+   ```
+
+3. **Check Endpoints**
+   ```sql
+   SHOW ENDPOINTS IN SERVICE snowsarva_service;
+   ```
+
+## Required Permissions
+
+The application requires these privileges (automatically granted during installation):
+
+- **CREATE COMPUTE POOL**: Create dedicated compute resources
+- **BIND SERVICE ENDPOINT**: Expose public web endpoints  
+- **CREATE WAREHOUSE**: Create query processing warehouses
+
+## Expected Outcome
+
+Once deployed successfully, you should have:
+
+1. ✅ A running React Hello World application
+2. ✅ Public web URL accessible via browser
+3. ✅ Beautiful gradient UI with "Hello World!" message
+4. ✅ Application management via SQL procedures
+5. ✅ Container running in Snowpark Container Services
+
+## Application Features
+
+The Hello World app includes:
+
+- **Beautiful UI**: Gradient background with modern styling
+- **Responsive Design**: Works on desktop and mobile
+- **Production Ready**: Nginx web server with optimizations
+- **Containerized**: Runs in Snowflake's container environment
+- **Secure**: Uses Snowflake's native security model
+
+## Support and Next Steps
+
+This POC demonstrates the foundation for building more complex Snowflake Native Apps. The next iteration could include:
+
+- Database connectivity for data visualization
+- Advanced React components and routing  
+- Backend API integration
+- Real-time data processing capabilities
+
+For issues or questions, refer to the application logs and Snowflake documentation.

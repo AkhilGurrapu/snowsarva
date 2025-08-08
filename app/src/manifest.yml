@@ -1,0 +1,23 @@
+# Snowsarva Hello World Native App Manifest
+manifest_version: 1
+
+version:
+  name: V1
+  label: "Version One"
+  comment: "Snowsarva Hello World React Application"
+
+# Artifacts that are distributed from this version of the package
+artifacts:
+  readme: readme.md
+  setup_script: setup.sql
+  container_services:
+    images:
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo/snowsarva_frontend
+
+privileges:
+  - CREATE COMPUTE POOL:
+      description: "Enable application to create its own compute pool(s)"
+  - BIND SERVICE ENDPOINT:
+      description: "Enables application to expose service endpoints"
+  - CREATE WAREHOUSE:
+      description: "Enables application to create its own warehouse(s)"
