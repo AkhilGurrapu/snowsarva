@@ -107,13 +107,22 @@ Links cited
   - Grant usage + bind endpoint + imported privileges on SNOWFLAKE DB
   - Start service; open URL
 
+### Dev/Prod parity
+- Development (local): `./local-dev.sh`
+  - Backend runs locally with `DEV_MODE=1`, chooses local connector (`USE_LOCAL_CONNECTOR=1`)
+  - Auth priority: PAT from `snowflake-pat.token` → `SNOWFLAKE_OAUTH_TOKEN` → `SNOWFLAKE_PASSWORD`
+  - Toggle `USE_ACCOUNT_USAGE=0` to avoid needing imported privileges; fallback uses SHOW queries
+- Production (Native App SPCS): `./deploy.sh` then run `CALL app_public.start_app('<pool>', '<warehouse>')`
+  - Requires consumer grants: IMPORTED PRIVILEGES ON SNOWFLAKE DB, BIND SERVICE ENDPOINT, USAGE on compute pool and warehouse
+  - Service spec runs three containers (frontend, backend, router) behind a public endpoint
+
 ## 8) Milestones & detailed steps
 
 ### M1: Foundations (1–2 days)
-- [ ] Create app schemas/tables for lineage/access/finops
-- [ ] Add secure views (basic) in `app_public`
-- [ ] Wire backend endpoints to return stub data
-- [ ] Add Grants UI (reads SHOW PRIVILEGES IN APPLICATION; displays SQL grant statements)
+- [x] Create app schemas/tables for lineage/access/finops
+- [x] Add secure views (basic) in `app_public`
+- [x] Wire backend endpoints to return stub data (metrics + grants status)
+- [x] Add Grants UI (displays required grants and SQL statements)
 
 ### M2: FinOps MVP (1–2 days)
 - [ ] Implement `sp_refresh_finops` (WAREHOUSE_METERING_HISTORY, METERING_DAILY_HISTORY, TABLE_STORAGE_METRICS, QUERY_HISTORY)

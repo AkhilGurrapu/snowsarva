@@ -21,5 +21,7 @@ privileges:
       description: "Enables application to expose service endpoints"
   - CREATE WAREHOUSE:
       description: "Enables application to create its own warehouse(s)"
+  - EXECUTE TASK:
+      description: "Enables application to schedule tasks if used for refresh"
   - IMPORTED PRIVILEGES ON SNOWFLAKE DB:
       description: "Allows reading from SNOWFLAKE.ACCOUNT_USAGE (consumer must grant)"

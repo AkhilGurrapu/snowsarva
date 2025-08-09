@@ -7,6 +7,23 @@ React + Flask behind Nginx, deployed via Snowpark Container Services inside a Sn
 - Router: Nginx routes `/` → frontend and `/api` → backend
 - App Artifacts: `app/src/manifest.yml`, `app/src/setup.sql`, `app/src/fullstack.yaml`
 
+## Dev/Prod parity
+
+- Local development (`./local-dev.sh`):
+  - Backend runs with `DEV_MODE=1` and prefers PAT from `snowflake-pat.token` via `SNOWFLAKE_TOKEN_FILE`.
+  - Fallbacks supported: `SNOWFLAKE_OAUTH_TOKEN` or `SNOWFLAKE_PASSWORD`.
+  - Frontend dev server proxies `/api` → `http://localhost:8081` (see `frontend/react/vite.config.js`).
+  - Toggle ACCOUNT_USAGE access check with `USE_ACCOUNT_USAGE=0` to use SHOW-based fallback.
+
+- Production (SPCS inside Native App):
+  - Deployed via `./deploy.sh` which builds/pushes images and runs `snow app run -p app/src`.
+  - Consumer grants required:
+    - `GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION <app>;`
+    - `GRANT USAGE ON COMPUTE POOL <pool> TO APPLICATION <app>;`
+    - `GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION <app>;`
+    - `GRANT USAGE ON WAREHOUSE <wh> TO APPLICATION <app>;`
+  - Backend uses the SPCS runtime token and the service `QUERY_WAREHOUSE` set by `app_public.start_app`.
+
 ## Configure image repository
 Run and paste the repository URL from `SHOW IMAGE REPOSITORIES IN SCHEMA SNOWSARVA_IMAGE_DATABASE.SNOWSARVA_IMAGE_SCHEMA;`.
 
@@ -35,6 +52,11 @@ GRANT APPLICATION ROLE snowsarva.app_user TO ROLE SNOWSARVA_CONSUMER;
 CALL snowsarva.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
 CALL snowsarva.app_public.app_url();
 ```
+
+### Grants screen
+
+- The frontend now includes a Grants tab that calls `/api/snowpark/grants/status` and renders required grants with copyable SQL.
+  - Endpoint returns whether `ACCOUNT_USAGE` access is effective (based on a test query) and shows SQL for the other grants.
 
 ## Troubleshooting and learnings
 
@@ -71,6 +93,10 @@ native_app:
 
 - Consumer role to use the app:
   - Use `SNOWSARVA_CONSUMER` when opening the URL and calling procedures.
+
+- Local dev auth errors:
+  - "The Programmatic Access Token (PAT) has been disabled": The PAT secret in `snowflake-pat.token` is disabled or rotated. Generate a new PAT in Snowsight and replace the file, or use OAuth/password temporarily.
+  - ACCOUNT_USAGE privileges not granted: start local with `USE_ACCOUNT_USAGE=0 ./local-dev.sh` to use SHOW-based fallback.
 
 ## Using ACCOUNT_USAGE metrics in the app
 
@@ -113,6 +139,44 @@ What it does:
 - Logs in to image registry (PAT)
 - Builds and pushes images
 - Runs `snow app run -p app/src` to upgrade the app
+
+## Local development without deploying to Snowflake
+
+Run the backend and frontend locally with a dev proxy. This does not modify Snowflake objects or services.
+
+```bash
+./local-dev.sh
+```
+
+Details:
+- Backend runs in a local container on port 8081 (env: `DEV_MODE=1`)
+- Frontend Vite dev server runs on port 5173 (or next free port), proxies `/api/*` to `http://localhost:8081`
+- Stop with Ctrl+C; no changes are pushed to Snowflake or the image repo
+
+### Local authentication (important)
+
+Snow CLI and the Python connector authenticate differently. CLI uses `authenticator = "PROGRAMMATIC_ACCESS_TOKEN"` with a token file, while the Python connector uses the PAT secret as the `password` value.
+
+- Verify CLI connection:
+  - `snow --config-file=config.toml connection test -c snowsarva`
+
+- Local backend auth options (pick one):
+  - PAT (Programmatic Access Token):
+    - Paste the PAT secret into `snowflake-pat.token` (single line). The script mounts it into the container at `/run/secrets/snowflake-pat.token` and sets `SNOWFLAKE_TOKEN_FILE`.
+    - The backend reads the file and passes the token to the Python connector as the `password`.
+    - If the PAT is disabled/rotated, local fails with: “The Programmatic Access Token (PAT) has been disabled.” Generate a new PAT and update the file.
+  - OAuth access token:
+    - `export SNOWFLAKE_OAUTH_TOKEN='eyJ...' && ./local-dev.sh`
+  - Username/password (local only):
+    - `SNOWFLAKE_PASSWORD='<your_password>' ./local-dev.sh`
+
+The local connector selection order is: PAT file → OAuth token → password. If none are present or a token is disabled/invalid, local returns HTTP 500 and logs the auth error.
+
+Environment variables passed by `local-dev.sh`:
+- `USE_LOCAL_CONNECTOR=1` (forces local connector; prod uses SPCS connector)
+- `SNOWFLAKE_TOKEN_FILE=/run/secrets/snowflake-pat.token` (mounted if file exists)
+- Account context is parsed from `config.toml` (account/user/warehouse/database/schema)
+- Also forwards `SNOWFLAKE_ROLE`, `SNOWFLAKE_OAUTH_TOKEN`, and `SNOWFLAKE_PASSWORD` to the backend container
 
 Configuration correct syntax: 
 (base) akhilgurrapu@Mac snowsarva % snow --config-file=config.toml connection test -c snowsarva 
