@@ -3,3 +3,4 @@ snowflake-snowpark-python
 pandas
 numpy
 flask
+sqlglot

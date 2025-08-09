@@ -6,7 +6,7 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 1) Start backend locally
 (
   cd "$ROOT_DIR/backend"
-  export API_PORT=8081 DEV_MODE=1 USE_ACCOUNT_USAGE=1 USE_LOCAL_CONNECTOR=1 \
+  export API_PORT=8081 DEV_MODE=1 USE_ACCOUNT_USAGE=0 USE_LOCAL_CONNECTOR=1 \
     SNOWFLAKE_ACCOUNT=$(grep '^account' "$ROOT_DIR/config.toml" | awk -F '"' '{print $2}') \
     SNOWFLAKE_USER=$(grep '^user' "$ROOT_DIR/config.toml" | awk -F '"' '{print $2}') \
     SNOWFLAKE_ROLE=$(grep '^role' "$ROOT_DIR/config.toml" | awk -F '"' '{print $2}') \
