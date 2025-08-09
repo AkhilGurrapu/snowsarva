@@ -33,12 +33,17 @@ def metrics():
             except Exception:
                 # Auto-fallback if not granted locally
                 path = 'SHOW'
-                databases_count = session.sql("SHOW DATABASES").count()
-                schemas_count = session.sql("SHOW SCHEMAS IN ACCOUNT").count()
+                # SHOW DATABASES -> RESULT_SCAN(LAST_QUERY_ID()) for counting
+                session.sql("SHOW DATABASES").collect()
+                databases_count = session.sql("SELECT COUNT(*) AS CNT FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()[0]['CNT']
+                session.sql("SHOW SCHEMAS IN ACCOUNT").collect()
+                schemas_count = session.sql("SELECT COUNT(*) AS CNT FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()[0]['CNT']
         else:
             # Local/dev fallback that doesn't require imported privileges
-            databases_count = session.sql("SHOW DATABASES").count()
-            schemas_count = session.sql("SHOW SCHEMAS IN ACCOUNT").count()
+            session.sql("SHOW DATABASES").collect()
+            databases_count = session.sql("SELECT COUNT(*) AS CNT FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()[0]['CNT']
+            session.sql("SHOW SCHEMAS IN ACCOUNT").collect()
+            schemas_count = session.sql("SELECT COUNT(*) AS CNT FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()[0]['CNT']
         return make_response(jsonify({
             'databases': int(databases_count),
             'schemas': int(schemas_count),
