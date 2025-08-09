@@ -1,18 +1,18 @@
-# Snowsarva Hello World Native App Manifest
 manifest_version: 1
 
 version:
   name: V1
   label: "Version One"
-  comment: "Snowsarva Hello World React Application"
+  comment: "Initial version of snowsarva Native App with SPCS"
 
-# Artifacts that are distributed from this version of the package
 artifacts:
   readme: readme.md
   setup_script: setup.sql
   container_services:
     images:
-      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_img_repo/snowsarva_frontend
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_frontend
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_backend
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_router
 
 privileges:
   - CREATE COMPUTE POOL:
@@ -21,3 +21,5 @@ privileges:
       description: "Enables application to expose service endpoints"
   - CREATE WAREHOUSE:
       description: "Enables application to create its own warehouse(s)"
+  - IMPORTED PRIVILEGES ON SNOWFLAKE DB:
+      description: "Allows reading from SNOWFLAKE.ACCOUNT_USAGE (consumer must grant)"

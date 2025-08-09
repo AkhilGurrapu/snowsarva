@@ -1,7 +1,0 @@
-definition_version: 1
-
-native_app:
-  name: snowsarva_hello_world
-  artifacts:
-    - src: app/
-      dest: ./

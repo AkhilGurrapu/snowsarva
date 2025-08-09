@@ -1,0 +1,29 @@
+spec:
+  containers:
+    - name: snowsarva-frontend
+      image: /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_frontend
+      resources:
+        requests:
+          cpu: 0.3
+          memory: 0.5Gi
+      env:
+        VITE_API_URL: /api/snowpark
+    - name: snowsarva-backend
+      image: /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_backend
+      resources:
+        requests:
+          cpu: 0.3
+          memory: 0.5Gi
+    - name: snowsarva-router
+      image: /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_router
+      resources:
+        requests:
+          cpu: 0.3
+          memory: 0.5Gi
+      env:
+        FE_SERVER: 127.0.0.1:8080
+        BE_SERVER: 127.0.0.1:8081
+  endpoints:
+    - name: app
+      port: 8000
+      public: true
