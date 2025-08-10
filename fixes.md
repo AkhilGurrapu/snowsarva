@@ -9,7 +9,7 @@ Migrate the `snowsarva` application from SHOW commands to comprehensive `SNOWFLA
 - **✅ Successfully deployed** enhanced application with comprehensive ACCOUNT_USAGE integration
 - **✅ Working service management** procedures (`start_app`, `stop_app`, `app_url`)
 - **✅ Enhanced metrics** displaying real-time cost tracking, user activity, and storage analysis
-- **🚀 Live Application:** https://app.snowflake.com/CHFWNRV/ddb48976/#/apps/application/SNOWSARVA_AKHILGURRAPU
+- **🚀 Live Application:** https://app.snowflake.com/YECALEZ/TCB02565/#/apps/application/SNOWSARVA_AKHILGURRAPU
 
 ---
 
@@ -275,7 +275,7 @@ The enhanced `snowsarva` application is successfully deployed with:
 - **🔧 Working Service Management:** Complete SPCS lifecycle management
 
 ### **Application URL:** 
-🌐 **https://app.snowflake.com/CHFWNRV/ddb48976/#/apps/application/SNOWSARVA_AKHILGURRAPU**
+🌐 **https://app.snowflake.com/YECALEZ/TCB02565/#/apps/application/SNOWSARVA_AKHILGURRAPU**
 
 ### **Test Commands (Now Working):**
 ```sql

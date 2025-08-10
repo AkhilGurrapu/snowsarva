@@ -243,8 +243,8 @@ snow --config-file=./config.toml sql -c snowsarva -q "CALL snowsarva_akhilgurrap
 
 **Expected Results:**
 - ✅ Service creation: "Service started. Check status, then call app_url() to get endpoint."
-- ✅ Endpoint retrieval: Returns SPCS endpoint URL (e.g., `fram4kec-chfwnrv-ddb48976.snowflakecomputing.app`)
-- ✅ Application URL: https://app.snowflake.com/CHFWNRV/ddb48976/#/apps/application/SNOWSARVA_AKHILGURRAPU
+- ✅ Endpoint retrieval: Returns SPCS endpoint URL (e.g., `fram4kec-YECALEZ-TCB02565.snowflakecomputing.app`)
+- ✅ Application URL: https://app.snowflake.com/YECALEZ/TCB02565/#/apps/application/SNOWSARVA_AKHILGURRAPU
 
 ### Deployment Verification Checklist
 
@@ -453,8 +453,8 @@ Configuration correct syntax:
 |-----------------+-----------------------------------------|
 | Connection name | snowsarva                               |
 | Status          | OK                                      |
-| Host            | CHFWNRV-DDB48976.snowflakecomputing.com |
-| Account         | CHFWNRV-DDB48976                        |
+| Host            | YECALEZ-TCB02565.snowflakecomputing.com |
+| Account         | YECALEZ-TCB02565                        |
 | User            | snowsarva_user                          |
 | Role            | SNOWSARVA_ROLE                          |
 | Database        | SNOWSARVA_IMAGE_DATABASE                |
