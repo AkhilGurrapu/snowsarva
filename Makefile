@@ -1,4 +1,4 @@
-SNOWFLAKE_REPO=chfwnrv-ddb48976.registry.snowflakecomputing.com/snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo
+SNOWFLAKE_REPO=yecalez-tcb02565.registry.snowflakecomputing.com/snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo
 BACKEND_IMAGE=snowsarva_backend
 FRONTEND_IMAGE=snowsarva_frontend
 ROUTER_IMAGE=snowsarva_router
@@ -8,8 +8,8 @@ help:            ## Show this help.
 
 all: login build push
 
-login:           ## Login to Snowflake image registry using Snow CLI (PAT in config.toml)
-	snow --config-file=./config.toml spcs image-registry login -c snowsarva || docker login $(SNOWFLAKE_REPO)
+login:           ## Login to Snowflake Docker repo
+	@echo "$(shell cat snowflake-pat.token)" | docker login $(SNOWFLAKE_REPO) --username snowsarva_user --password-stdin
 
 build: build_backend build_frontend build_router  ## Build Docker images for Snowpark Container Services
 
@@ -35,9 +35,3 @@ push_frontend:   ## Push frontend Docker image to Snowpark Container Services
 push_router:     ## Push router Docker image to Snowpark Container Services
 	docker tag $(ROUTER_IMAGE) $(SNOWFLAKE_REPO)/$(ROUTER_IMAGE)
 	docker push $(SNOWFLAKE_REPO)/$(ROUTER_IMAGE)
-
-app-run:         ## Build app package and run application object in Snowflake
-	cd app/src && snow --config-file=../../config.toml app run -c snowsarva
-
-deploy:          ## Configure, login, build, push, and run app in one go
-	./configure.sh && $(MAKE) all && $(MAKE) app-run
