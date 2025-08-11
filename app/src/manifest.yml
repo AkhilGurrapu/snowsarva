@@ -1,0 +1,27 @@
+manifest_version: 1
+
+version:
+  name: V1
+  label: "Version One"
+  comment: "Initial version of snowsarva Native App with SPCS"
+
+artifacts:
+  readme: readme.md
+  setup_script: setup.sql
+  container_services:
+    images:
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_frontend
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_backend
+      - /snowsarva_image_database/snowsarva_image_schema/snowsarva_image_repo/snowsarva_router
+
+privileges:
+  - CREATE COMPUTE POOL:
+      description: "Enable application to create its own compute pool(s)"
+  - BIND SERVICE ENDPOINT:
+      description: "Enables application to expose service endpoints"
+  - CREATE WAREHOUSE:
+      description: "Enables application to create its own warehouse(s)"
+  - EXECUTE TASK:
+      description: "Enables application to schedule tasks if used for refresh"
+  - IMPORTED PRIVILEGES ON SNOWFLAKE DB:
+      description: "Allows reading from SNOWFLAKE.ACCOUNT_USAGE (consumer must grant)"

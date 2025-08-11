@@ -19,38 +19,63 @@ Use parallel subagents to run tests, and make sure they all pass.
 If your changes touch the UX in a major way, use the browser to make sure that everything works correctly. Make a list of what to test for, and use a subagent for this step.
 
 If your testing shows problems, go back to the planning stage and think ultrahard.
+Local development should be separate and easy without effecting the production snowflake deployment which works.
+Work on below app.
 
-Main Ideas - Build a full functional snowflake native application using container services where we build custom full functional application that runs on these containers using the framework provided by snowflake
+# ⚡ Quick Commands (TL;DR)
 
-I have this repository, take this repo "https://github.com/Snowflake-Labs/sfguide-build-a-native-app-with-spcs" use github mcp to get all details on this repo, consider this repo as reference for initial setup but don't inspire from it for full functional, it's an working repo provided by snowflake how to setup the app and make it working.
+```bash
+# 🛠️ Local Development (safe, no Snowflake changes)
+./local-dev.sh                    # Start local dev (http://localhost:5173)
 
-where ask to user these mcp for relevant and maily snowflake cortex to get any information on snowflake as well we have docs folder that needed about snowflake native app and snowflake. the list of mcp we have - ""github, context7, sequential-thinking, playwright.""
+# 🚀 Deploy to Snowflake (production)
+./deploy.sh                       # Deploy to Snowflake Native App
 
-Only use docs folder if needed, Use sub agents for frontend and backend if needed any other things we are doing with mcp sub agents specific to every use case and use
+# 🔍 Check Connection  
+snow --config-file=config.toml connection test -c snowsarva
+```
 
-Snowsarva - for data discoverability/trace/metrics/data catalog/observability
-Data tagging, Classification, Roles, Lineage, ETL/ELT with DBT, testing anomoly detection
+## 🎯 Complete Production Deployment (Verified Working)
 
-This app should use all the metadata in snowflake - mainly 'Snowflake' database - shared with this app, and this app uses these data for all metrics
+```sql
+-- Step 1: Grant required privileges (as ACCOUNTADMIN)
+GRANT USAGE ON COMPUTE POOL CP_SNOWSARVA TO APPLICATION snowsarva_akhilgurrapu;
+GRANT USAGE ON WAREHOUSE WH_SNOWSARVA_CONSUMER TO APPLICATION snowsarva_akhilgurrapu;  
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva_akhilgurrapu;
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;
 
-1. Cost Management and Predictability
-2. Data Discovery and Navigation for Business Users
-3. Query Performance Optimization Tools
-4. Warehouse Management and Auto-Optimization
-5. Column level lineage and Roles lineage more simple clear with using any of the open source tools as suggested below.
+-- Step 2: Start service (as consumer user)
+use role snowsarva_consumer;
+use warehouse wh_snowsarva_consumer;
+CALL snowsarva_akhilgurrapu.app_public.stop_app();
+CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
+CALL snowsarva_akhilgurrapu.app_public.app_url();
+```
 
-High-level architecture
-* Snowflake Native App package (Snowflake Native Apps framework) with:
-    * Installer and setup scripts (application package + application).
-    * Secure views over ACCOUNT_USAGE, ORGANIZATION_USAGE, INFORMATION_SCHEMA, and HORIZON/lineage APIs.
-    * Stored procedures (Snowflake Scripting/Python) to materialize column-level lineage and role-access graphs.
-    * Optional task/scheduler to refresh lineage and metrics.
-    * Snowsight dashboards or Streamlit in-Snowflake app UI for visualization.
-* Data sources:
-    * Lineage: Snowsight lineage graph + query text parsing for column-level mapping.
-    * Access lineage: GRANTS/OBJECT_PRIVILEGES, ACCESS_HISTORY, LOGIN_HISTORY.
-    * FinOps: WAREHOUSE_METERING_HISTORY, METERING_DAILY_HISTORY, STORAGE_DAILY_HISTORY, QUERY_HISTORY.
-* Governance integration: Horizon catalog and classification tags for sensitive data, with policy checks.
+# snowsarva (Snowflake Native App with SPCS)
+
+React + Flask behind Nginx, deployed via Snowpark Container Services inside a Snowflake Native App. Uses `config.toml` and `snowflake-pat.token` for CLI auth.
+
+- Frontend: React (Vite) renders metrics from backend
+- Backend: Flask + Snowpark exposes `/snowpark/metrics`
+- Router: Nginx routes `/` → frontend and `/api` → backend
+- App Artifacts: `app/src/manifest.yml`, `app/src/setup.sql`, `app/src/fullstack.yaml`
+for auth: use snow cli only not snow sql 
+command - 
+```bash
+snow --config-file=config.toml connection test -c snowsarva
+```
+Use all these open source within the project to deliver what listed below:
+Open source tools:
+
+* dbt (Core & Artifacts) – For model metadata and source-to-model relationships
+* sqlglot or sqlfluff – For SQL parsing and extracting column-level lineage
+* dbt-column-lineage-extractor – Ready-made tool for dbt projects
+* OpenMetadata – Open-source lineage framework with built-in lineage APIs and UI
+* SQLLineage – Python package for parsing SQL statements and producing lineage graphs
+* Neo4j (or similar graph DB) – For storing column-level nodes and edges
+* React Flow, Cytoscape.js, or D3.js – For frontend lineage graph visualization
+* Tokern/Recce/Spline (optional) – Additional open-source lineage toolkits for inspiration or integration
 
 What the app delivers
 1. Column-level lineage
@@ -68,54 +93,6 @@ What the app delivers
 * Storage cost breakdown (tables, time travel, failsafe).
 * Marketplace/native app metering (if publishing).
 * SLA/SLO panels (e.g., cost per workload, $ per query, $ per TB scanned).
-
-Native App Solution: A cost management application that:
-* Provides real-time monitoring of warehouse usage and costs
-* Identifies optimization opportunities based on query patterns
-* Offers budget alerting and forecasting
-* Helps right-size warehouses for specific workloads
-* Allocates costs to different departments or projects
-* Recommends caching and materialization strategies
-
-A cost management application that:
-* Provides real-time monitoring of warehouse usage and costs
-* Identifies optimization opportunities based on query patterns
-* Offers budget alerting and forecasting
-* Helps right-size warehouses for specific workloads
-* Allocates costs to different departments or projects
-* Recommends caching and materialization strategies
-Real-time Cost Monitoring & Alerting
-Query Performance Advisor
-Data Quality Assurance & Remediation
-Governance & Access-Control Auditor
-Schema Migration Assistant
-Metadata Catalog & Lineage Tracker
-Natural-Language Query Assistant
-
-USE REACT FOR THIS AS FRAMEWORK WITH BACKEND TOO
-
-* Real-time Cost Monitoring & Alerting Many organizations face unpredictable Snowflake bills due to inefficient queries and lack of credit tracking1. A native app can continuously ingest usage data, apply anomaly detection (via an ML model in a container), and send budget-breach alerts through email or Slack. Built with Snowpark Container Services, the app runs in a dedicated compute pool and exposes a secure service endpoint for on-demand cost reports.
-
-* Query Performance Advisor Slow queries, overloaded warehouses and poor clustering are common performance bottlenecks. This app analyzes query history and micro-partition metadata, then generates recommendations-such as new clustering keys, warehouse resizing or query rewrites. The containerized service uses Snowflake UDFs to access metadata and writes advisories to a Snowflake table or dashboard.
-* Data Quality Assurance & Remediation Duplicate records, schema drift and missing data can undermine analytics1. A Snowflake Native App can run customizable quality checks on tables via scheduled container jobs, detect anomalies (e.g., unexpected null rates or pattern violations), and even auto-remediate by merging duplicates or casting drifting schemas. Results and fixes are logged in Snowflake for audit and traceability.
-* Governance & Access-Control Auditor Overly broad privileges and missing audit trails pose security and compliance risks1. This app scans roles, grants and ACCOUNT_USAGE views to identify privilege creep and policy violations. It then offers one-click SQL scripts to revoke or tighten permissions. Implemented as a container service, it writes findings to a governance dashboard and can integrate with existing SIEM tools.
-* Schema Migration Assistant Migrating from legacy systems often involves schema mismatches and transformation errors1. A containerized migration assistant can compare source and target schemas, generate DDLs, map data-type conversions, and even preview ETL scripts. Providers can bundle it as a native app so consumers can validate and execute migration plans entirely inside Snowflake.
-* Metadata Catalog & Lineage Tracker Lack of built-in lineage makes impact analysis hard1. This native app harvests metadata from INFORMATION_SCHEMA and ACCOUNT_USAGE, constructs a dependency graph, and stores lineage info in Snowflake tables. A REST-style endpoint (hosted in a container) serves lineage queries to BI tools or governance portals.
-* Natural-Language Query Assistant Business users often struggle to write SQL. Embedding an LLM in a Snowpark Container Service lets users submit plain-English prompts and receive optimized SQL back, all without data leaving Snowflake. The service runs within the customer’s compute pool and is exposed via a UDF for seamless adoption.
-
-
-Use any of the Open source tools:
-
-* dbt (Core & Artifacts) – For model metadata and source-to-model relationships
-* sqlglot or sqlfluff – For SQL parsing and extracting column-level lineage
-* dbt-column-lineage-extractor – Ready-made tool for dbt projects
-* OpenMetadata – Open-source lineage framework with built-in lineage APIs and UI
-* SQLLineage – Python package for parsing SQL statements and producing lineage graphs
-* Neo4j (or similar graph DB) – For storing column-level nodes and edges
-* React Flow, Cytoscape.js, or D3.js – For frontend lineage graph visualization
-* Tokern/Recce/Spline (optional) – Additional open-source lineage toolkits for inspiration or integration
-
-To build 
 High-level architecture
 * Snowflake Native App package (Snowflake Native Apps framework) with:
     * Installer and setup scripts (application package + application).
@@ -128,97 +105,553 @@ High-level architecture
     * Access lineage: GRANTS/OBJECT_PRIVILEGES, ACCESS_HISTORY, LOGIN_HISTORY.
     * FinOps: WAREHOUSE_METERING_HISTORY, METERING_DAILY_HISTORY, STORAGE_DAILY_HISTORY, QUERY_HISTORY.
 * Governance integration: Horizon catalog and classification tags for sensitive data, with policy checks.
-Snowflake features and references
-* Snowflake Native Apps framework: packaging, secure deployment, and distribution to consumers snowflake.com.
-* Horizon Catalog and governance: discovery, classification, policies, and monitoring docs.snowflake.com, plus hands-on quickstart for roles/personas and setup quickstarts.snowflake.com.
-* Built-in lineage in Snowsight (object-level) to complement or deep-link from your app docs.snowflake.com.
-* Context: third-party native observability apps (e.g., Metaplane pioneered Snowflake-native approach) metaplane.dev.
-Core objects and queries
-1. Lineage materialization
-* Consume QUERY_HISTORY and ACCESS_HISTORY to build a lineage edge table:
-    * Parse query text for column-level mappings (SELECT list, aliases, UDFs/UDAFs). For complex SQL, use Snowflake SQL parser logic in a Python stored procedure or apply pattern rules for common transforms.
-    * Store edges: source_object, source_column, target_object, target_column, query_id, timestamp.
-* Join with OBJECT_DEPENDENCIES/INFORMATION_SCHEMA for view dependencies.
-* Optional: enrich with Horizon tags (e.g., PII classification) to flag sensitive flows.
-1. Role-access lineage
-* GRANTS_TO_ROLES / GRANTS_TO_USERS from ACCOUNT_USAGE and INFORMATION_SCHEMA to map roles -> objects and privileges.
-* ACCESS_HISTORY to connect roles/users -> actual accessed objects and columns.
-* Build a graph: role -> privilege -> object -> columns; plus actual usage edges with counts.
-* Policies: detect excessive privileges vs. actual usage, sensitive-tag exposure, dormant grants.
-1. FinOps metrics
-* Compute and persist fact tables:
-    * Warehouse cost/utilization: ORGANIZATION_USAGE.METERING_DAILY_HISTORY + ACCOUNT_USAGE.WAREHOUSE_METERING_HISTORY.
-    * Query cost signals: ACCOUNT_USAGE.QUERY_HISTORY (bytes scanned, partitions pruned, spilled, queued).
-    * Storage: ORGANIZATION_USAGE.STORAGE_DAILY_HISTORY and ACCOUNT_USAGE.TABLE_STORAGE_METRICS.
-    * Per-dimension rollups: by warehouse, role, user, database/schema, task, query_tag, query_type.
-* KPIs:
-    * $ per query / per TB scanned.
-    * Warehouse efficiency: avg/peak concurrency, queue time %, auto-suspend gaps, auto-resume frequency.
-    * Storage growth: active vs. time travel vs. failsafe, orphaned objects, unused clones.
-    * Right-sizing: candidate warehouses to scale down, split, or use multi-cluster.
-    * Policy-based alerts: budget thresholds, anomalous spikes.
-Security and packaging for a Native App
-* Use application package with versioned schemas, secure views, and UDFs.
-* Avoid exfiltration: only expose results via secure views and tables in the application’s schema. Leverage shared access to ACCOUNT_USAGE/ORGANIZATION_USAGE as allowed by the Native Apps framework.
-* Provide setup sproc to request required privileges and create needed application roles.
-* Offer opt-in for parsing query text for column-level lineage (document data handling).
-* Provide configuration table for customers to set:
-    * Which databases/schemas to index.
-    * Data classification levels to monitor.
-    * Cost centers (via TAGS) to attribute charges.
-Example implementation sketch
-* Schemas: APP_CONFIG, APP_STAGE, APP_LINEAGE, APP_ACCESS, APP_FINOPS, APP_UI.
-* Tasks:
-    * TASK_REFRESH_LINEAGE: runs every 15 min to ingest latest QUERY_HISTORY and update lineage edges.
-    * TASK_REFRESH_ACCESS: runs hourly to sync grants and ACCESS_HISTORY usage.
-    * TASK_REFRESH_FINOPS: runs daily for cost/storage rollups and hourly for warehouse metering.
-* Key tables:
-    * APP_LINEAGE.COLUMN_EDGES(src_db, src_schema, src_obj, src_col, tgt_db, tgt_schema, tgt_obj, tgt_col, query_id, ts).
-    * APP_LINEAGE.OBJECT_EDGES(src_obj, tgt_obj, relation, ts).
-    * APP_ACCESS.ROLE_OBJECT_PRIVS(role, object, privilege, granted_on, granted_by).
-    * APP_ACCESS.ROLE_USAGE(role, object, column, last_used, use_count, users_count).
-    * APP_FINOPS.WH_COST(day, warehouse, credits, cost_usd, queries, bytes_scanned, queue_pct).
-    * APP_FINOPS.STORAGE_COST(day, db, schema, object, bytes, cost_usd, classification_tag).
-    * APP_FINOPS.QUERY_FACT(query_id, warehouse, user, role, query_tag, bytes_scanned, partitions_scanned, spilled, queued_sec, est_cost_usd).
-* Views and dashboards:
-    * Lineage graph views with filters by tag, database, time window.
-    * Role-effective-access matrix and “actual usage vs grant” variance.
-    * FinOps scorecards and savings recommendations.
-Developer steps to build and distribute
-1. Prototype lineage using Snowsight lineage and ACCOUNT_USAGE
-* Validate lineage coverage and column parsing; provide Snowsight deep links for each object docs.snowflake.com.
-1. Governance integration via Horizon
-* Pull catalog metadata, tags, and ownership; display trust indicators and owners in the app docs.snowflake.com.
-* Use the Horizon quickstart to model roles/personas for evaluation quickstarts.snowflake.com.
-1. Package as a Snowflake Native App
-* Follow the Native Apps quickstarts to define the application package, setup scripts, and secure artifacts snowflake.com.
-* Implement upgrade-safe versioning and migration scripts.
-1. Performance and costs
-* Use incremental ingestion from ACCOUNT_USAGE/ACCESS_HISTORY.
-* Partition tables by day and object; cluster by object and ts.
-* Guardrail configs: max history window, object allowlist, sampling options.
-1. Publishing
-* Provide a free “lite” mode with object-level lineage and summary FinOps.
-* Paid tier with column-level lineage parsing, anomaly detection, and custom alerts.
-* Consider marketplace distribution and metering events.
-Notes and caveats
-* Column-level lineage quality depends on SQL parsing coverage; document unsupported patterns and UDF handling.
-* Access to some ORGANIZATION_USAGE views may require org-level privileges in the target account.
-* Align cost estimation to Snowflake pricing and customer contracts; show credits and optionally derive USD with customer-provided rate.
-If helpful, I can provide starter DDL, a Python sproc template for column-level lineage parsing, and a minimal Native App package skeleton next. References: snowflake.com, docs.snowflake.com, docs.snowflake.com, quickstarts.snowflake.com, metaplane.dev.
 
 
+## Dev/Prod parity
 
+- Local development (`./local-dev.sh`):
+  - Backend runs with `DEV_MODE=1` and prefers PAT from `snowflake-pat.token` via `SNOWFLAKE_TOKEN_FILE`.
+  - Fallbacks supported: `SNOWFLAKE_OAUTH_TOKEN` or `SNOWFLAKE_PASSWORD`.
+  - Frontend dev server proxies `/api` → `http://localhost:8081` (see `frontend/react/vite.config.js`).
+  - Toggle ACCOUNT_USAGE access check with `USE_ACCOUNT_USAGE=0` to use SHOW-based fallback.
 
+- Production (SPCS inside Native App):
+  - Deployed via `./deploy.sh` which builds/pushes images and runs `snow app run -p app/src`.
+  - Consumer grants required:
+    - `GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION <app>;`
+    - `GRANT USAGE ON COMPUTE POOL <pool> TO APPLICATION <app>;`
+    - `GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION <app>;`
+    - `GRANT USAGE ON WAREHOUSE <wh> TO APPLICATION <app>;`
+  - Backend uses the SPCS runtime token and the service `QUERY_WAREHOUSE` set by `app_public.start_app`.
 
+## Configure image repository
+Run and paste the repository URL from `SHOW IMAGE REPOSITORIES IN SCHEMA SNOWSARVA_IMAGE_DATABASE.SNOWSARVA_IMAGE_SCHEMA;`.
 
-Use this githrepo open source for reference
-https://github.com/open-metadata/OpenMetadata
-https://github.com/OpenLineage/OpenLineage
-https://github.com/elementary-data/elementary
-https://github.com/datachecks/dcs-core
+```bash
+./configure.sh
+```
 
-build this native apps examples
-https://github.com/snowflakedb/native-apps-examples
-https://github.com/Snowflake-Labs/sfguide-getting-started-with-native-apps
-https://github.com/Snowflake-Labs/sfguide-native-apps-chairlift
+## Build and push images
+```bash
+make all
+```
+
+## Run the app (developer)
+```bash
+# From repo root
+snow --config-file=./config.toml app run -c snowsarva -p app/src
+```
+
+## Complete Production Deployment Process (Verified Working)
+
+### Step 1: Deploy Application
+```bash
+./deploy.sh                       # Deploy to Snowflake Native App
+```
+
+### Step 2: Grant Required Privileges (as ACCOUNTADMIN)
+```sql
+-- Required grants for the application to work
+GRANT USAGE ON COMPUTE POOL CP_SNOWSARVA TO APPLICATION snowsarva_akhilgurrapu;
+GRANT USAGE ON WAREHOUSE WH_SNOWSARVA_CONSUMER TO APPLICATION snowsarva_akhilgurrapu;
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva_akhilgurrapu;
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;
+```
+
+### Step 3: Consumer Setup and Service Management
+```sql
+-- As consumer user (snowsarva_consumer role)
+use role snowsarva_consumer;
+use warehouse wh_snowsarva_consumer;
+
+-- Grant application roles
+GRANT APPLICATION ROLE snowsarva.app_admin TO ROLE SNOWSARVA_CONSUMER;
+GRANT APPLICATION ROLE snowsarva.app_user TO ROLE SNOWSARVA_CONSUMER;
+
+-- Stop service (if running)
+CALL snowsarva_akhilgurrapu.app_public.stop_app();
+
+-- Start the service
+CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
+
+-- Get the application URL
+CALL snowsarva_akhilgurrapu.app_public.app_url();
+```
+
+## Legacy Consumer Steps (for reference)
+- Install the app and open Worksheets
+- Grant app roles and start the service
+
+```sql
+GRANT APPLICATION ROLE snowsarva.app_admin TO ROLE SNOWSARVA_CONSUMER;
+GRANT APPLICATION ROLE snowsarva.app_user TO ROLE SNOWSARVA_CONSUMER;
+CALL snowsarva.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
+CALL snowsarva.app_public.app_url();
+```
+
+### Grants screen
+
+- The frontend now includes a Grants tab that calls `/api/snowpark/grants/status` and renders required grants with copyable SQL.
+  - Endpoint returns whether `ACCOUNT_USAGE` access is effective (based on a test query) and shows SQL for the other grants.
+
+## Troubleshooting and learnings
+
+- Snow CLI project file (`snowflake.yml`):
+  - For CLI v3.10.0, a minimal file under `app/src/snowflake.yml` works:
+    ```
+definition_version: 1
+native_app:
+  name: snowsarva
+  artifacts:
+    - src: ./*
+      dest: ./
+    ```
+  - Run with `-p app/src` from repo root so `config.toml` and `snowflake-pat.token` resolve.
+
+- Imported privileges on SNOWFLAKE:
+  - To read `SNOWFLAKE.ACCOUNT_USAGE`, the app must request the global privilege in `manifest.yml`, and the consumer must grant it to the application. Format per docs: `IMPORTED PRIVILEGES ON SNOWFLAKE DB`.
+  - We now request this privilege in `app/src/manifest.yml`. After upgrading the app, a consumer admin grants:
+    - `GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;`
+  - Reference: Request global privileges in Native Apps ([docs](https://docs.snowflake.com/en/developer-guide/native-apps/requesting-privs)).
+  - If the app version didn’t request the privilege, Snowflake returns “not requested by current application version.” Upgrade the app first, then re-grant.
+  - Until the grant is applied, a fallback is to query counts using SHOW-based queries instead of ACCOUNT_USAGE.
+
+- CPU capacity error when starting service:
+  - Error: requirement exceeds compute pool capacity. Fixed by reducing per-container requests in `app/src/fullstack.yaml` to 0.3 CPU and 0.5Gi memory each.
+
+- Idempotent setup on app upgrade:
+  - `CREATE APPLICATION ROLE` failed on upgrade. Fixed by using `IF NOT EXISTS` in `app/src/setup.sql`.
+
+- Grants required to run the service (as ACCOUNTADMIN):
+  - `GRANT USAGE ON COMPUTE POOL CP_SNOWSARVA TO APPLICATION snowsarva_akhilgurrapu;`
+  - `GRANT USAGE ON WAREHOUSE WH_SNOWSARVA_CONSUMER TO APPLICATION snowsarva_akhilgurrapu;`
+  - `GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva_akhilgurrapu;`
+
+- Consumer role to use the app:
+  - Use `SNOWSARVA_CONSUMER` when opening the URL and calling procedures.
+
+- Local dev auth errors:
+  - "The Programmatic Access Token (PAT) has been disabled": The PAT secret in `snowflake-pat.token` is disabled or rotated. Generate a new PAT in Snowsight and replace the file, or use OAuth/password temporarily.
+  - ACCOUNT_USAGE privileges not granted: start local with `USE_ACCOUNT_USAGE=0 ./local-dev.sh` to use SHOW-based fallback.
+
+## Using ACCOUNT_USAGE metrics in the app
+
+Once the consumer grants imported privileges, the backend uses `SNOWFLAKE.ACCOUNT_USAGE.{DATABASES,SCHEMATA}` for metrics.
+
+- Confirm privilege request appears in the app:
+  - `SHOW PRIVILEGES IN APPLICATION snowsarva_akhilgurrapu;`
+- Grant privilege (admin role):
+  - `GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;`
+- Restart service as consumer (if already running):
+  - `CALL snowsarva_akhilgurrapu.app_public.stop_app();`
+  - `CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');`
+  - `CALL snowsarva_akhilgurrapu.app_public.app_url();`
+
+## Cross-check counts via Snow CLI
+
+- SHOW-based (matches app behavior when using fallback):
+  - `snow --config-file=config.toml sql -c snowsarva -q "SHOW DATABASES; SELECT COUNT(*) AS DATABASES FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));"`
+  - `snow --config-file=config.toml sql -c snowsarva -q "SHOW SCHEMAS IN ACCOUNT; SELECT COUNT(*) AS SCHEMAS FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));"`
+- INFORMATION_SCHEMA (alternative):
+  - `snow --config-file=config.toml sql -c snowsarva -q "SELECT COUNT(*) AS DATABASES FROM INFORMATION_SCHEMA.DATABASES;"`
+  - `snow --config-file=config.toml sql -c snowsarva -q "SELECT COUNT(*) AS SCHEMAS FROM INFORMATION_SCHEMA.SCHEMATA;"`
+
+## Common errors and fixes
+
+- PAT token file not found: Run Snow CLI from repo root or pass absolute `--config-file`.
+- “not requested by current application version”: Upgrade app so manifest includes the privilege, then re-grant.
+- Service capacity exceeded: reduce container `resources.requests` in `fullstack.yaml` or use a larger pool.
+- Object exists on upgrade: make setup idempotent (`IF NOT EXISTS`).
+- Wrong app name in SQL: verify with `SHOW APPLICATIONS LIKE 'SNOWSARVA%';` and use that exact name in all GRANTs and CALLs.
+
+## 🎯 Proven Deployment Process (Aug 2025)
+
+### Quick Deploy (Tested & Working)
+
+```bash
+# Single command - deploys enhanced app with ACCOUNT_USAGE integration
+./deploy.sh
+```
+
+**What happens (verified working):**
+- ✅ Builds Docker images for backend and router
+- ✅ Pushes to Snowflake image repository 
+- ✅ Validates setup.sql syntax (all fixes applied)
+- ✅ Upgrades application with enhanced features
+- ✅ Shows deployment URL
+
+### Verified Service Management
+
+```bash
+# Start the service (tested command)
+snow --config-file=./config.toml sql -c snowsarva -q "CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');"
+
+# Get service endpoint (confirmed working)
+snow --config-file=./config.toml sql -c snowsarva -q "CALL snowsarva_akhilgurrapu.app_public.app_url();"
+```
+
+**Expected Results:**
+- ✅ Service creation: "Service started. Check status, then call app_url() to get endpoint."
+- ✅ Endpoint retrieval: Returns SPCS endpoint URL (e.g., `fram4kec-YECALEZ-TCB02565.snowflakecomputing.app`)
+- ✅ Application URL: https://app.snowflake.com/YECALEZ/TCB02565/#/apps/application/SNOWSARVA_AKHILGURRAPU
+
+### Deployment Verification Checklist
+
+**✅ Pre-deployment:**
+- [ ] Local development tested and working
+- [ ] All setup_* temporary files cleaned up
+- [ ] setup.sql contains only production-ready code
+
+**✅ During deployment:**
+- [ ] Docker images build successfully
+- [ ] No syntax errors in setup.sql validation
+- [ ] Application upgrade completes successfully
+
+**✅ Post-deployment:**
+- [ ] Service starts without errors
+- [ ] app_url() returns valid endpoint
+- [ ] Enhanced metrics working (/api/snowpark/metrics/enhanced)
+- [ ] ACCOUNT_USAGE integration functional
+
+### Common Deployment Issues (All Fixed)
+
+**Issue: "syntax error on line X unexpected 'ON'"**
+- ✅ **Fixed**: Removed all `AS $$` delimiters from stored procedures
+- ✅ **Fixed**: Used `CREATE APPLICATION ROLE IF NOT EXISTS` 
+- ✅ **Fixed**: Used `CREATE OR ALTER VERSIONED SCHEMA`
+
+**Issue: "ON CONFLICT" syntax not supported**
+- ✅ **Fixed**: Replaced with `MERGE INTO` statements for upserts
+
+**Issue: Service creation parameter escaping**
+- ✅ **Fixed**: Triple quotes (`'''`) around parameters in `EXECUTE IMMEDIATE`
+
+**Issue: Session schema context missing**
+- ✅ **Fixed**: Added `USE SCHEMA v1;` after schema creation
+
+### File Cleanup (Completed)
+
+**Removed debugging artifacts:**
+- ❌ `setup_backup.sql`
+- ❌ `setup_full_backup.sql` 
+- ❌ `setup_incremental.sql`
+- ❌ `setup_minimal.sql`
+- ❌ All corresponding symlinks in `output/deploy/`
+
+**Kept production files:**
+- ✅ `app/src/setup.sql` (2,875 bytes, fully functional)
+- ✅ `app/src/output/deploy/setup.sql` (symlink to main file)
+
+## 🚀 Development Workflow (Clear & Simple)
+
+### Step 1: Local Development Setup
+
+**Prerequisites:**
+- Docker installed and running
+- Snow CLI configured with valid PAT token
+- Project configured with `config.toml` and `snowflake-pat.token`
+
+**Verify your setup:**
+```bash
+# Test CLI connection first
+snow --config-file=config.toml connection test -c snowsarva
+
+# Should show "Status: OK" with your account details
+```
+
+**Start local development:**
+```bash
+# From project root - this starts both backend and frontend
+./local-dev.sh
+```
+
+**What happens:**
+- ✅ Backend (Flask + Snowpark) runs in Docker container on port 8081
+- ✅ Frontend (React + Vite) starts on port 5173 (or next available)
+- ✅ Automatic proxy: Frontend `/api/*` routes to backend `http://localhost:8081`
+- ✅ Hot reload: Changes to React code refresh immediately
+- ✅ Database connection: Uses your PAT token to connect to Snowflake
+- ✅ **No deployment**: Nothing is changed in Snowflake, purely local
+
+**Access your app:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8081/api/snowpark/metrics/enhanced
+- Logs: Both services show real-time logs in terminal
+
+**Stop development:**
+- Press `Ctrl+C` to stop both services
+- No cleanup needed - purely local development
+
+### Step 2: Test Your Changes
+
+**Frontend changes:**
+- Edit files in `frontend/react/src/`
+- Browser auto-refreshes on save
+- Check browser console for any errors
+
+**Backend changes:**
+- Edit files in `backend/src/`
+- Stop with `Ctrl+C` and restart `./local-dev.sh`
+- Docker rebuilds and restarts automatically
+
+**New dependencies:**
+```bash
+# Frontend dependencies
+cd frontend/react && npm install
+
+# Backend dependencies - edit backend/src/requirements.txt
+# Then restart ./local-dev.sh to rebuild container
+```
+
+### Step 3: Deploy to Snowflake
+
+**When ready for production deployment:**
+```bash
+# Single command deployment from project root
+./deploy.sh
+```
+
+**What happens:**
+- ✅ Builds Docker images for backend and router
+- ✅ Pushes images to Snowflake image repository
+- ✅ Validates and deploys Native App setup script
+- ✅ Upgrades existing application (if already deployed)
+- ✅ Shows deployment URL
+
+**Post-deployment setup (first time only):**
+```sql
+-- As ACCOUNTADMIN, grant required privileges
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION <app_name>;
+GRANT USAGE ON COMPUTE POOL <pool> TO APPLICATION <app_name>;
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION <app_name>;
+GRANT USAGE ON WAREHOUSE <warehouse> TO APPLICATION <app_name>;
+
+-- As consumer role, start the service
+GRANT APPLICATION ROLE <app_name>.app_admin TO ROLE <consumer_role>;
+GRANT APPLICATION ROLE <app_name>.app_user TO ROLE <consumer_role>;
+CALL <app_name>.app_public.start_app('<compute_pool>', '<warehouse>');
+CALL <app_name>.app_public.app_url();
+```
+
+### Authentication Details
+
+**Local Development Authentication (automatic):**
+The script handles authentication in this priority order:
+1. **PAT Token** (recommended): Put token secret in `snowflake-pat.token` file
+2. **OAuth Token**: `export SNOWFLAKE_OAUTH_TOKEN='eyJ...' && ./local-dev.sh`
+3. **Password**: `SNOWFLAKE_PASSWORD='password' ./local-dev.sh`
+
+**Production Authentication (automatic):**
+- Uses SPCS runtime service tokens
+- No manual setup required
+
+### Troubleshooting Common Issues
+
+**Port conflicts:**
+```bash
+# If you see "port already allocated"
+docker ps -a  # Find conflicting containers
+docker stop <container_id>
+./local-dev.sh  # Restart
+```
+
+**Authentication errors:**
+```bash
+# If PAT token fails
+snow --config-file=config.toml connection test -c snowsarva
+# Generate new PAT in Snowsight if needed
+```
+
+**Frontend not loading:**
+```bash
+# Check if Vite dev server started
+# Look for "Local: http://localhost:5173" in output
+# If port is different, use that URL
+```
+
+**Backend errors:**
+```bash
+# Check Docker logs
+docker logs <container_name>
+# Look for Snowflake connection errors
+```
+
+### Development Best Practices
+
+**File structure:**
+- ✅ Keep local development and deployment separate
+- ✅ Always test locally before deploying
+- ✅ Use version control for all changes
+
+**Testing workflow:**
+1. Make changes locally
+2. Test in browser at localhost:5173
+3. Verify API endpoints work
+4. Deploy to Snowflake when ready
+5. Test production deployment
+
+**Clean development:**
+- ✅ Local development never affects Snowflake objects
+- ✅ Only deployment (`./deploy.sh`) changes Snowflake
+- ✅ Safe to experiment and iterate locally
+
+Configuration correct syntax: 
+(base) akhilgurrapu@Mac snowsarva % snow --config-file=config.toml connection test -c snowsarva 
++-----------------------------------------------------------+
+| key             | value                                   |
+|-----------------+-----------------------------------------|
+| Connection name | snowsarva                               |
+| Status          | OK                                      |
+| Host            | YECALEZ-TCB02565.snowflakecomputing.com |
+| Account         | YECALEZ-TCB02565                        |
+| User            | snowsarva_user                          |
+| Role            | SNOWSARVA_ROLE                          |
+| Database        | SNOWSARVA_IMAGE_DATABASE                |
+| Warehouse       | SNOWSARVA_WAREHOUSE                     |
++-----------------------------------------------------------+
+
+# Enhanced Features Implementation (Aug 10, 2025)
+
+## Overview
+Implemented comprehensive column-level lineage, access lineage by roles, and FinOps metrics using open source tools, following the existing codebase patterns while adding powerful new capabilities.
+
+## What Was Delivered
+
+### ✅ Column-Level Lineage
+- **SQL Parsing Engine**: Using sqlglot to extract column dependencies from CREATE TABLE AS SELECT, INSERT, MERGE, UPDATE queries
+- **Auto-Discovery**: Processes SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY for automatic lineage detection from DDL/DML queries
+- **dbt Integration**: Upload and process dbt manifest.json files for model lineage extraction with dependency graphs
+- **Interactive Visualization**: React Flow-based lineage graphs with different node types (tables, columns, dbt models) and dagre layout
+- **Enhanced API Endpoints**: 
+  - `/api/snowpark/lineage/sql-parse` - Parse SQL text for column-level lineage
+  - `/api/snowpark/lineage/auto-discover` - Auto-discover from query history
+  - `/api/snowpark/lineage/dbt-upload` - Process dbt artifacts
+  - `/api/snowpark/lineage/enhanced-object` - Enhanced recursive lineage queries
+
+### ✅ Access Lineage by Roles  
+- **Grants Analysis**: Processes GRANTS_TO_ROLES and OBJECT_PRIVILEGES from ACCOUNT_USAGE for current privilege state
+- **Usage Tracking**: Analyzes ACCESS_HISTORY for actual usage patterns by role/user/object with access counts
+- **Role Hierarchy**: Builds role inheritance graphs from role grants
+- **Column-Level Access**: Tracks which roles access which specific columns from COLUMNS_ACCESSED data
+- **Enhanced API Endpoints**:
+  - `/api/snowpark/access/analyze-grants` - Current grants and privileges analysis
+  - `/api/snowpark/access/analyze-history` - Usage patterns from ACCESS_HISTORY
+  - `/api/snowpark/access/role-graph` - Role-specific access graphs
+
+### ✅ FinOps Metrics & Cost Analysis
+- **Warehouse Costs**: WAREHOUSE_METERING_HISTORY analysis with credit usage breakdown by warehouse/compute/cloud services
+- **Query Performance**: Query cost analysis by user/role, identifies expensive queries (>1min execution time)
+- **Storage Analysis**: TABLE_STORAGE_METRICS breakdown by database/schema (active, time travel, failsafe, clone storage)
+- **Cost Estimation**: Estimated dollar costs based on credit usage (2x multiplier)
+- **Enhanced API Endpoints**:
+  - `/api/snowpark/finops/warehouse-analysis` - Warehouse cost analysis
+  - `/api/snowpark/finops/query-analysis` - Query performance and cost analysis  
+  - `/api/snowpark/finops/storage-analysis` - Storage cost breakdown
+  - `/api/snowpark/finops/comprehensive-analysis` - Combined analysis with storage option
+
+### ✅ Enhanced Frontend Interface
+- **Tabbed Interface**: Each major feature (Lineage/Access/FinOps) has multiple specialized analysis tabs
+- **Lineage Tab Sub-tabs**: Manual Query, SQL Parser, Auto-Discover, dbt Artifacts
+- **Access Tab Sub-tabs**: Grants Analysis, Access History, Role Graph
+- **FinOps Tab Sub-tabs**: Warehouse Costs, Query Analysis, Storage Costs, Comprehensive Analysis
+- **Interactive Lineage Graph**: Visual lineage with different node types, colors, and layouts using React Flow
+- **Real-time Analytics**: Cost breakdowns, usage patterns, access summaries with formatted metrics
+- **File Upload Support**: dbt manifest.json upload with drag-and-drop interface
+
+### ✅ Integration & Management
+- **Scheduled Procedures**: 
+  - `app_public.refresh_lineage_data()` - Placeholder for automated lineage refresh
+  - `app_public.refresh_finops_data()` - Daily FinOps data refresh from WAREHOUSE_METERING_HISTORY
+  - `app_public.cleanup_old_data(retention_days)` - Cleanup old lineage/FinOps data
+- **Health Monitoring**: 
+  - `/api/snowpark/status/health` - Comprehensive health check with ACCOUNT_USAGE access test
+  - `/api/snowpark/status/data-summary` - Data summary with table counts and recent timestamps
+- **Admin Controls**: 
+  - `/api/snowpark/admin/refresh-lineage` - Manual lineage refresh trigger
+  - `/api/snowpark/admin/refresh-finops` - Manual FinOps refresh trigger  
+  - `/api/snowpark/admin/cleanup-data` - Manual data cleanup trigger
+- **Enhanced Database Schema**: Added metadata columns, performance indexes, and proper grants
+
+## Technical Implementation
+
+### Open Source Tools Integration
+- **sqlglot>=25.0.0**: SQL parsing and AST analysis for column lineage extraction with Snowflake dialect support
+- **sqlfluff>=3.1.0**: SQL linting and additional parsing capabilities
+- **sqllineage>=1.5.4**: Column-level lineage extraction with networkx graph support
+- **dbt-artifacts-parser>=0.6.0**: dbt manifest.json and catalog.json processing
+- **@xyflow/react**: Interactive graph visualization with custom node types and layouts
+- **dagre**: Automatic graph layout algorithms for hierarchical lineage visualization
+- **elkjs**: Alternative graph layout engine for complex lineage graphs
+
+### Backend Architecture (Python + Flask + Snowpark)
+- **New Modules Created**:
+  - `backend/src/lineage_parser.py` - SnowflakeLineageExtractor and DbtArtifactsProcessor classes
+  - `backend/src/access_analyzer.py` - AccessLineageAnalyzer and FinOpsAnalyzer classes
+- **Enhanced Database Schema**: 
+  - Added metadata columns (node_type, lineage_source, confidence_score, created_at, updated_at)
+  - Performance indexes on frequently queried columns
+  - Enhanced stored procedures for data management
+- **API Expansion**: From ~6 to 25 endpoints with comprehensive error handling and fallback mechanisms
+- **Session Management**: Maintained existing dual-connector pattern (SPCS vs local dev) with enhanced resilience
+
+### Frontend Architecture (React + Vite + Tailwind)
+- **Component Structure**:
+  - `frontend/react/src/components/LineageGraph.jsx` - Interactive lineage visualization component
+  - Enhanced `frontend/react/src/App.jsx` with tabbed interfaces and state management
+- **Styling**: Maintained existing Tailwind-first approach with Material-UI components for forms
+- **State Management**: Added comprehensive state for lineage data, access analysis, and FinOps metrics
+- **User Experience**: Progressive disclosure with tabbed interfaces and loading states
+
+### Database Schema Enhancements
+- **Enhanced Tables**: Added metadata tracking, confidence scoring, and audit fields to v1.lineage_nodes and v1.lineage_edges
+- **Performance Indexes**: 6 new indexes on frequently queried columns for lineage and edge tables
+- **Stored Procedures**: 3 new procedures for data refresh and cleanup with proper error handling
+- **Security**: Maintained existing application role structure with appropriate grants
+
+## Key Statistics
+- **25 API endpoints** (expanded from ~6 original endpoints)
+- **46 SQL DDL statements** in enhanced schema (tables, indexes, procedures, grants)
+- **Enhanced database tables** with proper metadata tracking and performance optimization
+- **Comprehensive error handling** with graceful fallbacks when ACCOUNT_USAGE not granted
+- **Production-ready** with proper separation of local dev and SPCS deployment environments
+
+## Usage Instructions
+
+### Local Development Testing
+```bash
+# Install new frontend dependencies
+cd frontend/react && npm install
+
+# Start local development (requires Docker)
+./local-dev.sh
+
+# Access at http://localhost:5173
+# Backend API at http://localhost:8081/api/snowpark
+```
+
+### Feature Testing Guide
+1. **LINEAGE Tab**: Test SQL parsing with CREATE TABLE AS SELECT queries, try auto-discovery from query history
+2. **ACCESS Tab**: Analyze grants and usage patterns, explore role-object relationships  
+3. **FINOPS Tab**: Review warehouse costs, identify expensive queries, analyze storage usage
+4. **dbt Integration**: Upload manifest.json files to extract model lineage
+5. **Admin Features**: Use refresh and cleanup endpoints for data management
+
+### Production Deployment
+```bash
+# Deploy enhanced app to Snowflake
+./deploy.sh
+
+# Grant required privileges (as ACCOUNTADMIN)
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva;
+GRANT USAGE ON COMPUTE POOL <pool> TO APPLICATION snowsarva;
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva;
+```
+
+## Architecture Decisions
+- **Maintained Compatibility**: All changes are additive and backward-compatible with existing functionality
+- **Error Resilience**: Graceful degradation when ACCOUNT_USAGE privileges not granted (falls back to SHOW commands)
+- **Performance First**: Added proper indexes and optimized queries for large-scale lineage analysis
+- **Modular Design**: New functionality in separate modules that can be independently tested and maintained
+- **User Experience**: Progressive disclosure with tabbed interfaces to manage complexity while maintaining discoverability
+
+This implementation transforms the basic metrics app into a comprehensive Snowflake governance and optimization platform while maintaining the existing architecture and deployment patterns.
