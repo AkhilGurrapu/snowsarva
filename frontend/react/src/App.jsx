@@ -8,11 +8,12 @@ import DataLineage from './components/DataLineage'
 import Recommendations from './components/Recommendations'
 import CostDashboard from './components/CostDashboard'
 import Performance from './components/Performance'
+import Connections from './components/Connections'
 
 export default function App() {
   const [activeSection, setActiveSection] = useState('dashboard')
   const [loading, setLoading] = useState(false)
-  const [metrics, setMetrics] = useState({ databases: 0, schemas: 0, tables: 0, views: 0 })
+  const [metrics, setMetrics] = useState(null)
   const [refreshTime, setRefreshTime] = useState(new Date())
 
   const apiBase = import.meta.env.VITE_API_URL || '/api/snowpark'
@@ -111,6 +112,8 @@ export default function App() {
         return <CostDashboard />
       case 'performance':
         return <Performance />
+      case 'connections':
+        return <Connections />
       default:
         return <Dashboard metrics={metrics} loading={loading} />
     }
@@ -127,7 +130,7 @@ export default function App() {
               <span className="text-white text-lg font-bold">❄️</span>
             </div>
             <div>
-              <div className="text-xl font-bold text-gray-900">Snowflake</div>
+              <div className="text-xl font-bold text-gray-900">SnowSarva</div>
               <div className="text-sm text-gray-500">Powered by DataSarva</div>
             </div>
           </div>
@@ -156,8 +159,8 @@ export default function App() {
                       }
                     `}
                   >
-                    <span className="text-lg">{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span className="text-lg flex-shrink-0">{item.icon}</span>
+                    <span className="sidebar-nav-text">{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -193,6 +196,7 @@ export default function App() {
                 {activeSection === 'recommendations' && 'AI-powered optimization suggestions'}
                 {activeSection === 'cost-dashboard' && 'Track and optimize your Snowflake spend'}
                 {activeSection === 'performance' && 'Query performance insights and monitoring'}
+                {activeSection === 'connections' && 'Snowflake account and connection details'}
               </p>
             </div>
             <div className="flex items-center space-x-4">

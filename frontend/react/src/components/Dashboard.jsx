@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import LoadingSpinner, { MetricCardSkeleton, MetricValueLoader } from './LoadingSpinner'
 
 export default function Dashboard({ metrics, loading }) {
   const [healthData, setHealthData] = useState(null)
@@ -13,6 +14,9 @@ export default function Dashboard({ metrics, loading }) {
 
   useEffect(() => {
     async function fetchDashboardData() {
+      // Only fetch dashboard-specific data if we have main metrics
+      if (!metrics) return
+      
       try {
         setLoadingData(true)
         setError(null)
@@ -124,7 +128,7 @@ export default function Dashboard({ metrics, loading }) {
       {/* Top metrics cards */}
       <div className="grid grid-cols-4 gap-6">
         {/* Data Quality Score */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-600">Data Quality Score</div>
             <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center">
@@ -152,7 +156,7 @@ export default function Dashboard({ metrics, loading }) {
         </div>
 
         {/* Tests */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-600">Tests</div>
             <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
@@ -191,29 +195,26 @@ export default function Dashboard({ metrics, loading }) {
         </div>
 
         {/* Queries */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-600">Queries</div>
             <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center">
               <span className="text-purple-600">🔍</span>
             </div>
           </div>
-          {loadingData ? (
-            <>
-              <div className="text-3xl font-bold text-gray-300 mb-1 animate-pulse">--</div>
-              <div className="text-sm text-gray-400">Fetching query data...</div>
-            </>
+          {!metrics || loading ? (
+            <MetricValueLoader color="purple" />
           ) : (
             <>
               <div className="text-3xl font-bold text-gray-900 mb-1">
-                {queryStats?.total_queries_analyzed ?? (metrics?.query_metrics?.QUERIES_LAST_24H || 'No data')}
+                {queryStats?.total_queries_analyzed ?? metrics?.query_metrics?.QUERIES_LAST_24H ?? 'No data'}
               </div>
               <div className="text-sm text-gray-500">
                 {queryStats?.avg_execution_time_ms ? 
                   `${(queryStats.avg_execution_time_ms / 1000).toFixed(2)}s avg time` : 
                   metrics?.query_metrics?.AVG_QUERY_TIME_MS ? 
                   `${(metrics.query_metrics.AVG_QUERY_TIME_MS / 1000).toFixed(2)}s avg time` :
-                  'No query data available'
+                  'Last 24 hours'
                 }
               </div>
             </>
@@ -221,21 +222,18 @@ export default function Dashboard({ metrics, loading }) {
         </div>
 
         {/* Tables */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-600">Tables</div>
             <div className="w-6 h-6 bg-orange-100 rounded flex items-center justify-center">
               <span className="text-orange-600">📊</span>
             </div>
           </div>
-          {loadingData ? (
-            <>
-              <div className="text-3xl font-bold text-gray-300 mb-1 animate-pulse">--</div>
-              <div className="text-sm text-gray-400">Fetching table data...</div>
-            </>
+          {!metrics || loading ? (
+            <MetricValueLoader color="orange" />
           ) : (
             <>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{metrics?.tables ?? 'No data'}</div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">{metrics.tables}</div>
               <div className="text-sm text-gray-500">Total tables</div>
             </>
           )}
@@ -254,96 +252,182 @@ export default function Dashboard({ metrics, loading }) {
             {/* Table header */}
             <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
               <div className="grid grid-cols-5 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <div>Column name</div>
-                <div>Test name</div>
-                <div>Test type</div>
-                <div>Last test run</div>
-                <div>Last status</div>
+                <div className="text-left">Column name</div>
+                <div className="text-left">Test name</div>
+                <div className="text-left">Test type</div>
+                <div className="text-left">Last test run</div>
+                <div className="text-center">Last status</div>
               </div>
             </div>
             {/* Table rows */}
             <div className="divide-y divide-gray-200">
-              {testResults.map((test, index) => (
+              {testResults.length > 0 ? testResults.map((test, index) => (
                 <div key={index} className="px-6 py-4">
                   <div className="grid grid-cols-5 gap-4 items-center">
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 text-left">
                       {test.column || '-'}
                     </div>
-                    <div className="flex items-center space-x-2 text-sm">
+                    <div className="flex items-center space-x-2 text-sm text-left">
                       <span>{getTestIcon(test.name, test.status)}</span>
-                      <span className="text-blue-600">{test.name}</span>
+                      <span className="text-blue-600 truncate">{test.name}</span>
                     </div>
-                    <div className="text-sm text-gray-900">{test.type}</div>
-                    <div className="text-sm text-gray-500">{test.time}</div>
-                    <div>
+                    <div className="text-sm text-gray-900 text-left capitalize">{test.type}</div>
+                    <div className="text-sm text-gray-500 text-left">{test.time}</div>
+                    <div className="text-center">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(test.status)}`}>
                         {test.status}
                       </span>
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="px-6 py-8 text-center">
+                  <div className="text-gray-400 text-lg mb-2">📋</div>
+                  <div className="text-gray-500 text-sm">No test results available</div>
+                  <div className="text-gray-400 text-xs mt-1">
+                    Tests will appear here once data quality checks are configured
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Recent Updates */}
+        {/* System Status & Updates */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Recent Updates</h3>
-            <p className="text-sm text-gray-500">Latest table updates</p>
+            <h3 className="text-lg font-medium text-gray-900">System Status</h3>
+            <p className="text-sm text-gray-500">Connection and service health information</p>
           </div>
           <div className="p-6">
-            <div className="text-center py-12">
-              <div className="text-gray-400 text-lg mb-2">📝</div>
-              <div className="text-gray-500">No recent updates</div>
-            </div>
+            {healthData ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      healthData.session === 'connected' ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                    <span className="text-sm font-medium text-gray-900">Database Connection</span>
+                  </div>
+                  <span className={`text-sm font-medium capitalize ${
+                    healthData.session === 'connected' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {healthData.session}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      healthData.account_usage_access ? 'bg-green-500' : 'bg-yellow-500'
+                    }`}></div>
+                    <span className="text-sm font-medium text-gray-900">ACCOUNT_USAGE Access</span>
+                  </div>
+                  <span className={`text-sm font-medium ${
+                    healthData.account_usage_access ? 'text-green-600' : 'text-yellow-600'
+                  }`}>
+                    {healthData.account_usage_access ? 'Enabled' : 'Limited'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      healthData.status === 'healthy' ? 'bg-green-500' : 
+                      healthData.status === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}></div>
+                    <span className="text-sm font-medium text-gray-900">Overall Status</span>
+                  </div>
+                  <span className={`text-sm font-medium capitalize ${
+                    healthData.status === 'healthy' ? 'text-green-600' : 
+                    healthData.status === 'degraded' ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {healthData.status}
+                  </span>
+                </div>
+
+                {healthData.timestamp && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="text-xs text-gray-500">
+                      Last updated: {new Date(healthData.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : loadingData ? (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner text="Loading system status..." color="blue" />
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-lg mb-2">⚙️</div>
+                <div className="text-gray-500 text-sm">System status unavailable</div>
+                <div className="text-gray-400 text-xs mt-1">
+                  Unable to retrieve system health information
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Additional metrics row */}
       <div className="grid grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="text-sm text-gray-600 mb-2">Databases</div>
-          {loadingData ? (
-            <>
-              <div className="text-2xl font-bold text-gray-300 animate-pulse">--</div>
-              <div className="text-sm text-gray-400">Fetching...</div>
-            </>
+          {!metrics || loading ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 animate-spin text-green-500">
+                <svg className="w-full h-full" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="m12 2a10 10 0 0 1 10 10h-4a6 6 0 0 0-6-6z"/>
+                </svg>
+              </div>
+              <span className="text-2xl font-bold text-green-500">Loading...</span>
+            </div>
           ) : (
             <>
-              <div className="text-2xl font-bold text-gray-900">{metrics?.databases ?? 'No data'}</div>
+              <div className="text-2xl font-bold text-gray-900">{metrics.databases}</div>
               <div className="text-sm text-green-600">↗ Active databases</div>
             </>
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="text-sm text-gray-600 mb-2">Schemas</div>
-          {loadingData ? (
-            <>
-              <div className="text-2xl font-bold text-gray-300 animate-pulse">--</div>
-              <div className="text-sm text-gray-400">Fetching...</div>
-            </>
+          {!metrics || loading ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 animate-spin text-blue-500">
+                <svg className="w-full h-full" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="m12 2a10 10 0 0 1 10 10h-4a6 6 0 0 0-6-6z"/>
+                </svg>
+              </div>
+              <span className="text-2xl font-bold text-blue-500">Loading...</span>
+            </div>
           ) : (
             <>
-              <div className="text-2xl font-bold text-gray-900">{metrics?.schemas ?? 'No data'}</div>
+              <div className="text-2xl font-bold text-gray-900">{metrics.schemas}</div>
               <div className="text-sm text-blue-600">→ Active schemas</div>
             </>
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm metric-card">
           <div className="text-sm text-gray-600 mb-2">Views</div>
-          {loadingData ? (
-            <>
-              <div className="text-2xl font-bold text-gray-300 animate-pulse">--</div>
-              <div className="text-sm text-gray-400">Fetching...</div>
-            </>
+          {!metrics || loading ? (
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 animate-spin text-purple-500">
+                <svg className="w-full h-full" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="m12 2a10 10 0 0 1 10 10h-4a6 6 0 0 0-6-6z"/>
+                </svg>
+              </div>
+              <span className="text-2xl font-bold text-purple-500">Loading...</span>
+            </div>
           ) : (
             <>
-              <div className="text-2xl font-bold text-gray-900">{metrics?.views ?? 'No data'}</div>
+              <div className="text-2xl font-bold text-gray-900">{metrics.views}</div>
               <div className="text-sm text-purple-600">↑ Active views</div>
             </>
           )}

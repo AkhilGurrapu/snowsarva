@@ -33,10 +33,23 @@ Work on below app.
 
 # 🔍 Check Connection  
 snow --config-file=config.toml connection test -c snowsarva
+```
 
-# 📊 Start Service (after deploy)
-snow --config-file=./config.toml sql -c snowsarva -q "CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');"
-snow --config-file=./config.toml sql -c snowsarva -q "CALL snowsarva_akhilgurrapu.app_public.app_url();"
+## 🎯 Complete Production Deployment (Verified Working)
+
+```sql
+-- Step 1: Grant required privileges (as ACCOUNTADMIN)
+GRANT USAGE ON COMPUTE POOL CP_SNOWSARVA TO APPLICATION snowsarva_akhilgurrapu;
+GRANT USAGE ON WAREHOUSE WH_SNOWSARVA_CONSUMER TO APPLICATION snowsarva_akhilgurrapu;  
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva_akhilgurrapu;
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;
+
+-- Step 2: Start service (as consumer user)
+use role snowsarva_consumer;
+use warehouse wh_snowsarva_consumer;
+CALL snowsarva_akhilgurrapu.app_public.stop_app();
+CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
+CALL snowsarva_akhilgurrapu.app_public.app_url();
 ```
 
 # snowsarva (Snowflake Native App with SPCS)
@@ -129,7 +142,43 @@ make all
 snow --config-file=./config.toml app run -c snowsarva -p app/src
 ```
 
-## Consumer steps (Snowsight as SNOWSARVA_CONSUMER)
+## Complete Production Deployment Process (Verified Working)
+
+### Step 1: Deploy Application
+```bash
+./deploy.sh                       # Deploy to Snowflake Native App
+```
+
+### Step 2: Grant Required Privileges (as ACCOUNTADMIN)
+```sql
+-- Required grants for the application to work
+GRANT USAGE ON COMPUTE POOL CP_SNOWSARVA TO APPLICATION snowsarva_akhilgurrapu;
+GRANT USAGE ON WAREHOUSE WH_SNOWSARVA_CONSUMER TO APPLICATION snowsarva_akhilgurrapu;
+GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO APPLICATION snowsarva_akhilgurrapu;
+GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO APPLICATION snowsarva_akhilgurrapu;
+```
+
+### Step 3: Consumer Setup and Service Management
+```sql
+-- As consumer user (snowsarva_consumer role)
+use role snowsarva_consumer;
+use warehouse wh_snowsarva_consumer;
+
+-- Grant application roles
+GRANT APPLICATION ROLE snowsarva.app_admin TO ROLE SNOWSARVA_CONSUMER;
+GRANT APPLICATION ROLE snowsarva.app_user TO ROLE SNOWSARVA_CONSUMER;
+
+-- Stop service (if running)
+CALL snowsarva_akhilgurrapu.app_public.stop_app();
+
+-- Start the service
+CALL snowsarva_akhilgurrapu.app_public.start_app('CP_SNOWSARVA', 'WH_SNOWSARVA_CONSUMER');
+
+-- Get the application URL
+CALL snowsarva_akhilgurrapu.app_public.app_url();
+```
+
+## Legacy Consumer Steps (for reference)
 - Install the app and open Worksheets
 - Grant app roles and start the service
 
