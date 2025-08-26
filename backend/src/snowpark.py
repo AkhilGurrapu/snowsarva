@@ -7,6 +7,8 @@ import json
 import tempfile
 from lineage_parser import SnowflakeLineageExtractor, DbtArtifactsProcessor
 from access_analyzer import AccessLineageAnalyzer, FinOpsAnalyzer
+from data_quality_monitor import DataQualityMonitor, MonitorConfig, AlertManager
+from notification_system import NotificationManager, AlertNotification
 
 # Choose connector based on environment to keep prod and local isolated
 # Default to SPCS connector; local-dev.sh sets USE_LOCAL_CONNECTOR=1
@@ -958,3 +960,406 @@ def finops_summary():
         return make_response(jsonify([r.as_dict() for r in df.limit(5000).to_local_iterator()]))
     except Exception as e:
         abort(500, f'Error reading finops summary: {str(e)}')
+
+
+# =============================================================================
+# Data Quality Monitoring Endpoints (Elementary Features Integration)
+# =============================================================================
+
+@snowpark.route('/data-quality/monitor/volume', methods=['POST'])
+def data_quality_monitor_volume():
+    """Execute volume anomaly monitoring for a table"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        # Get request parameters
+        table_name = request.json.get('table_name')
+        timestamp_column = request.json.get('timestamp_column')
+        config_params = request.json.get('config', {})
+        
+        if not table_name:
+            return make_response(jsonify({'error': 'table_name is required'}), 400)
+        
+        # Create monitor configuration
+        config = MonitorConfig(
+            sensitivity=int(config_params.get('sensitivity', 3)),
+            training_period_days=int(config_params.get('training_period_days', 14)),
+            detection_period_days=int(config_params.get('detection_period_days', 2)),
+            anomaly_direction=config_params.get('anomaly_direction', 'both'),
+            ignore_small_changes_threshold=float(config_params.get('ignore_small_changes_threshold', 0.05))
+        )
+        
+        # Execute monitoring
+        monitor = DataQualityMonitor(s, config)
+        result = monitor.execute_volume_monitoring(table_name, timestamp_column)
+        
+        # Store alert if detected
+        if result.get('alert'):
+            alert_manager = AlertManager(s)
+            alert_data = result['alert']
+            from data_quality_monitor import DataQualityAlert
+            from datetime import datetime
+            
+            alert = DataQualityAlert(
+                id=alert_data['id'],
+                alert_type=alert_data['alert_type'],
+                table_full_name=alert_data['table_full_name'],
+                column_name=alert_data['column_name'],
+                metric_name=alert_data['metric_name'],
+                current_value=alert_data['current_value'],
+                expected_range=tuple(alert_data['expected_range']),
+                severity=alert_data['severity'],
+                detected_at=datetime.fromisoformat(alert_data['detected_at']),
+                description=alert_data['description'],
+                test_params=alert_data['test_params']
+            )
+            alert_manager.store_alert(alert)
+        
+        return make_response(jsonify(result))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'volume_monitoring_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/monitor/freshness', methods=['POST'])
+def data_quality_monitor_freshness():
+    """Execute freshness anomaly monitoring for a table"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        # Get request parameters
+        table_name = request.json.get('table_name')
+        timestamp_column = request.json.get('timestamp_column')
+        config_params = request.json.get('config', {})
+        
+        if not table_name or not timestamp_column:
+            return make_response(jsonify({'error': 'table_name and timestamp_column are required'}), 400)
+        
+        # Create monitor configuration
+        config = MonitorConfig(
+            sensitivity=int(config_params.get('sensitivity', 3)),
+            training_period_days=int(config_params.get('training_period_days', 14)),
+            detection_period_days=int(config_params.get('detection_period_days', 2))
+        )
+        
+        # Execute monitoring
+        monitor = DataQualityMonitor(s, config)
+        result = monitor.execute_freshness_monitoring(table_name, timestamp_column)
+        
+        # Store alert if detected
+        if result.get('alert'):
+            alert_manager = AlertManager(s)
+            alert_data = result['alert']
+            from data_quality_monitor import DataQualityAlert
+            from datetime import datetime
+            
+            alert = DataQualityAlert(
+                id=alert_data['id'],
+                alert_type=alert_data['alert_type'],
+                table_full_name=alert_data['table_full_name'],
+                column_name=alert_data['column_name'],
+                metric_name=alert_data['metric_name'],
+                current_value=alert_data['current_value'],
+                expected_range=tuple(alert_data['expected_range']),
+                severity=alert_data['severity'],
+                detected_at=datetime.fromisoformat(alert_data['detected_at']),
+                description=alert_data['description'],
+                test_params=alert_data['test_params']
+            )
+            alert_manager.store_alert(alert)
+        
+        return make_response(jsonify(result))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'freshness_monitoring_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/monitor/column-quality', methods=['POST'])
+def data_quality_monitor_column_quality():
+    """Execute column-level quality monitoring"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        # Get request parameters
+        table_name = request.json.get('table_name')
+        column_name = request.json.get('column_name')
+        timestamp_column = request.json.get('timestamp_column')
+        config_params = request.json.get('config', {})
+        
+        if not table_name or not column_name:
+            return make_response(jsonify({'error': 'table_name and column_name are required'}), 400)
+        
+        # Create monitor configuration
+        config = MonitorConfig(
+            sensitivity=int(config_params.get('sensitivity', 3)),
+            training_period_days=int(config_params.get('training_period_days', 14)),
+            detection_period_days=int(config_params.get('detection_period_days', 2))
+        )
+        
+        # Execute monitoring
+        monitor = DataQualityMonitor(s, config)
+        result = monitor.execute_column_quality_monitoring(table_name, column_name, timestamp_column)
+        
+        # Store alerts if detected
+        if result.get('alerts'):
+            alert_manager = AlertManager(s)
+            from data_quality_monitor import DataQualityAlert
+            from datetime import datetime
+            
+            for alert_data in result['alerts']:
+                alert = DataQualityAlert(
+                    id=alert_data['id'],
+                    alert_type=alert_data['alert_type'],
+                    table_full_name=alert_data['table_full_name'],
+                    column_name=alert_data['column_name'],
+                    metric_name=alert_data['metric_name'],
+                    current_value=alert_data['current_value'],
+                    expected_range=tuple(alert_data['expected_range']),
+                    severity=alert_data['severity'],
+                    detected_at=datetime.fromisoformat(alert_data['detected_at']),
+                    description=alert_data['description'],
+                    test_params=alert_data['test_params']
+                )
+                alert_manager.store_alert(alert)
+        
+        return make_response(jsonify(result))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'column_quality_monitoring_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/monitor/comprehensive', methods=['POST'])
+def data_quality_monitor_comprehensive():
+    """Run comprehensive monitoring across multiple tables and metrics"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        # Get request parameters
+        tables_config = request.json.get('tables_config', [])
+        config_params = request.json.get('config', {})
+        
+        if not tables_config:
+            return make_response(jsonify({'error': 'tables_config is required'}), 400)
+        
+        # Create monitor configuration
+        config = MonitorConfig(
+            sensitivity=int(config_params.get('sensitivity', 3)),
+            training_period_days=int(config_params.get('training_period_days', 14)),
+            detection_period_days=int(config_params.get('detection_period_days', 2)),
+            anomaly_direction=config_params.get('anomaly_direction', 'both')
+        )
+        
+        # Execute comprehensive monitoring
+        monitor = DataQualityMonitor(s, config)
+        result = monitor.run_comprehensive_monitoring(tables_config)
+        
+        # Store all alerts detected
+        alert_manager = AlertManager(s)
+        from data_quality_monitor import DataQualityAlert
+        from datetime import datetime
+        
+        for table_result in result['table_results']:
+            for monitor_result in table_result['monitors']:
+                if monitor_result.get('alert'):
+                    alert_data = monitor_result['alert']
+                    alert = DataQualityAlert(
+                        id=alert_data['id'],
+                        alert_type=alert_data['alert_type'],
+                        table_full_name=alert_data['table_full_name'],
+                        column_name=alert_data['column_name'],
+                        metric_name=alert_data['metric_name'],
+                        current_value=alert_data['current_value'],
+                        expected_range=tuple(alert_data['expected_range']),
+                        severity=alert_data['severity'],
+                        detected_at=datetime.fromisoformat(alert_data['detected_at']),
+                        description=alert_data['description'],
+                        test_params=alert_data['test_params']
+                    )
+                    alert_manager.store_alert(alert)
+                
+                if monitor_result.get('alerts'):
+                    for alert_data in monitor_result['alerts']:
+                        alert = DataQualityAlert(
+                            id=alert_data['id'],
+                            alert_type=alert_data['alert_type'],
+                            table_full_name=alert_data['table_full_name'],
+                            column_name=alert_data['column_name'],
+                            metric_name=alert_data['metric_name'],
+                            current_value=alert_data['current_value'],
+                            expected_range=tuple(alert_data['expected_range']),
+                            severity=alert_data['severity'],
+                            detected_at=datetime.fromisoformat(alert_data['detected_at']),
+                            description=alert_data['description'],
+                            test_params=alert_data['test_params']
+                        )
+                        alert_manager.store_alert(alert)
+        
+        return make_response(jsonify(result))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'comprehensive_monitoring_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/monitor/suggestions')
+def data_quality_monitor_suggestions():
+    """Get monitoring setup suggestions based on available tables"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        monitor = DataQualityMonitor(s)
+        result = monitor.get_monitoring_suggestions()
+        
+        return make_response(jsonify(result))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'suggestions_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/alerts')
+def data_quality_alerts():
+    """Get active data quality alerts"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        limit = int(request.args.get('limit', 50))
+        
+        alert_manager = AlertManager(s)
+        alerts = alert_manager.get_active_alerts(limit)
+        
+        return make_response(jsonify({
+            'alerts': alerts,
+            'total_count': len(alerts),
+            'limit': limit
+        }))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'get_alerts_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/alerts/<alert_id>/status', methods=['PUT'])
+def data_quality_alert_status(alert_id):
+    """Update alert status (active, resolved, suppressed)"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        status = request.json.get('status')
+        
+        if status not in ['active', 'resolved', 'suppressed']:
+            return make_response(jsonify({'error': 'Invalid status. Must be active, resolved, or suppressed'}), 400)
+        
+        alert_manager = AlertManager(s)
+        success = alert_manager.update_alert_status(alert_id, status)
+        
+        if success:
+            return make_response(jsonify({'status': 'success', 'alert_id': alert_id, 'new_status': status}))
+        else:
+            return make_response(jsonify({'error': 'Failed to update alert status'}), 500)
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'update_alert_status_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/notifications/test', methods=['POST'])
+def data_quality_notifications_test():
+    """Test notification channels"""
+    try:
+        # Initialize notification manager
+        notification_manager = NotificationManager()
+        
+        # Load configuration from environment or request
+        config_from_request = request.json.get('config', {})
+        
+        if config_from_request.get('slack_webhook'):
+            notification_manager.add_slack_channel(config_from_request['slack_webhook'])
+        
+        if config_from_request.get('teams_webhook'):
+            notification_manager.add_teams_channel(config_from_request['teams_webhook'])
+        
+        if config_from_request.get('webhook_url'):
+            notification_manager.add_webhook_channel(config_from_request['webhook_url'])
+        
+        # If no config provided, try to load from environment
+        if not config_from_request:
+            notification_manager.load_config_from_env()
+        
+        # Test all channels
+        results = notification_manager.test_channels()
+        
+        return make_response(jsonify({
+            'test_results': results,
+            'channels_tested': len(results),
+            'successful_channels': len([r for r in results.values() if r])
+        }))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'notification_test_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/data-quality/notifications/send', methods=['POST'])
+def data_quality_notifications_send():
+    """Send notification for an alert"""
+    try:
+        # Get alert details from request
+        alert_data = request.json.get('alert')
+        notification_config = request.json.get('config', {})
+        
+        if not alert_data:
+            return make_response(jsonify({'error': 'alert data is required'}), 400)
+        
+        # Create notification object
+        from datetime import datetime
+        notification = AlertNotification(
+            alert_id=alert_data['alert_id'],
+            alert_type=alert_data['alert_type'],
+            table_name=alert_data['table_name'],
+            metric_name=alert_data['metric_name'],
+            severity=alert_data['severity'],
+            current_value=float(alert_data['current_value']),
+            expected_range=(float(alert_data['expected_min']), float(alert_data['expected_max'])),
+            description=alert_data['description'],
+            detected_at=datetime.fromisoformat(alert_data['detected_at']),
+            environment=alert_data.get('environment', 'production')
+        )
+        
+        # Initialize notification manager
+        notification_manager = NotificationManager()
+        
+        # Configure channels
+        if notification_config.get('slack_webhook'):
+            notification_manager.add_slack_channel(notification_config['slack_webhook'])
+        
+        if notification_config.get('teams_webhook'):
+            notification_manager.add_teams_channel(notification_config['teams_webhook'])
+        
+        if notification_config.get('webhook_url'):
+            notification_manager.add_webhook_channel(notification_config['webhook_url'])
+        
+        # Load from environment if no config provided
+        if not notification_config:
+            notification_manager.load_config_from_env()
+        
+        # Send notification
+        results = notification_manager.send_alert_notification(notification)
+        
+        return make_response(jsonify({
+            'notification_results': results,
+            'channels_notified': len([r for r in results.values() if r]),
+            'total_channels': len(results)
+        }))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'send_notification_failed: {str(e)}'}), 500)

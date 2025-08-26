@@ -22,6 +22,13 @@ If your testing shows problems, go back to the planning stage and think ultrahar
 Local development should be separate and easy without effecting the production snowflake deployment which works.
 Work on below app.
 
+# Main Prompt:
+Use the 'elementary' folder, try to understand the architecture, features, what's it's for, what it solves everything about the elementary folder, and then replicate the same in snowsarva application, we have here which is snowflake native app running on snowpark containerized services. Please don't effect the working model, lets try to test it out in local development, main goal is to go through elementary folder and try to implement all the features offered by elementary mainly 'lineage' and metrics that align with our native application that you could find below the idealogy. Please it should be perfect use parallel agents, go through all the .md files for more context in root folder, once we migrate all the features in elementary to native app, I will be dropping the elementary folder which here only for reference. Please use all the MCP servers for all the purposes.
+
+
+
+# guidance on app below
+
 # ⚡ Quick Commands (TL;DR)
 
 ```bash

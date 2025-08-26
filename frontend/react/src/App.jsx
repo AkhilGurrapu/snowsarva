@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import DataObservability from './components/DataObservability'
+import DataQualityMonitor from './components/DataQualityMonitor'
 import QueryAdvisor from './components/QueryAdvisor'
 import DatabaseExplorer from './components/DatabaseExplorer'
 import WarehouseManager from './components/WarehouseManager'
@@ -65,6 +66,7 @@ export default function App() {
       items: [
         { key: 'dashboard', icon: '🏠', label: 'Dashboard' },
         { key: 'data-observability', icon: '👁️', label: 'Data Observability' },
+        { key: 'data-quality', icon: '🔬', label: 'Data Quality' },
         { key: 'query-advisor', icon: '🔍', label: 'Query Advisor' }
       ]
     },
@@ -98,6 +100,8 @@ export default function App() {
         return <Dashboard metrics={metrics} loading={loading} />
       case 'data-observability':
         return <DataObservability />
+      case 'data-quality':
+        return <DataQualityMonitor />
       case 'query-advisor':
         return <QueryAdvisor />
       case 'databases':
@@ -189,6 +193,7 @@ export default function App() {
               <p className="text-sm text-gray-600 mt-1">
                 {activeSection === 'dashboard' && 'Overview of your Snowflake data environment'}
                 {activeSection === 'data-observability' && 'Monitor data quality, freshness and completeness'}
+                {activeSection === 'data-quality' && 'Advanced data quality monitoring with anomaly detection and alerts'}
                 {activeSection === 'query-advisor' && 'Analyze and optimize your Snowflake queries'}
                 {activeSection === 'databases' && 'Explore and manage your databases'}
                 {activeSection === 'warehouses' && 'Monitor warehouse performance and costs'}
