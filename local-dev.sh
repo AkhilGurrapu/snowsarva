@@ -3,8 +3,22 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Pick a free host port for the backend in 8081-8099
+HOST_PORT=""
+for p in $(seq 8081 8099); do
+  if ! lsof -Pi :$p -sTCP:LISTEN -t >/dev/null 2>&1; then
+    HOST_PORT=$p
+    break
+  fi
+done
+if [[ -z "$HOST_PORT" ]]; then
+  echo "No free backend port found in 8081-8099" >&2
+  exit 1
+fi
+echo "Using backend port ${HOST_PORT}"
+
 # 1) Start backend locally
-(
+( 
   cd "$ROOT_DIR/backend"
   export API_PORT=8081 DEV_MODE=1 USE_ACCOUNT_USAGE=0 USE_LOCAL_CONNECTOR=1 \
     SNOWFLAKE_ACCOUNT=$(grep '^account' "$ROOT_DIR/config.toml" | awk -F '"' '{print $2}') \
@@ -28,12 +42,13 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
     -e SNOWFLAKE_PASSWORD="$PAT_STR" \
     -e SNOWFLAKE_OAUTH_TOKEN \
     -v "$ROOT_DIR/snowflake-pat.token":/run/secrets/snowflake-pat.token:ro \
-    -p 8081:8081 snowsarva_backend_local &
+    -p ${HOST_PORT}:8081 snowsarva_backend_local &
 )
 
 # 2) Start frontend dev server with proxy to backend
 (
   cd "$ROOT_DIR/frontend/react"
+  export BACKEND_PORT=${HOST_PORT}
   npm install
   npm run dev
 )

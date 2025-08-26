@@ -1363,3 +1363,384 @@ def data_quality_notifications_send():
         
     except Exception as e:
         return make_response(jsonify({'error': f'send_notification_failed: {str(e)}'}), 500)
+
+
+# LineageVisualizer specific endpoints for Snowflake integration
+
+@snowpark.route('/databases')
+def get_databases():
+    """Get all databases from Snowflake INFORMATION_SCHEMA or ACCOUNT_USAGE"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        use_account_usage = os.getenv('USE_ACCOUNT_USAGE', '1') in ('1', 'true', 'True')
+        
+        if use_account_usage:
+            try:
+                # Use ACCOUNT_USAGE for comprehensive database list
+                result = s.sql("""
+                    SELECT 
+                        DATABASE_NAME,
+                        DATABASE_OWNER,
+                        CREATED,
+                        COMMENT
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.DATABASES 
+                    WHERE DELETED IS NULL 
+                    ORDER BY DATABASE_NAME
+                """).collect()
+                
+                databases = []
+                for row in result:
+                    databases.append({
+                        'id': row['DATABASE_NAME'],
+                        'name': row['DATABASE_NAME'], 
+                        'database_name': row['DATABASE_NAME'],
+                        'owner': row['DATABASE_OWNER'],
+                        'created': row['CREATED'].isoformat() if row['CREATED'] else None,
+                        'comment': row['COMMENT']
+                    })
+                
+                return make_response(jsonify(databases))
+                
+            except Exception as e:
+                # Fallback to SHOW DATABASES
+                pass
+        
+        # Fallback: Use SHOW DATABASES
+        s.sql("SHOW DATABASES").collect()
+        result = s.sql("SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()
+        
+        databases = []
+        for row in result:
+            databases.append({
+                'id': row['name'],
+                'name': row['name'],
+                'database_name': row['name'],
+                'owner': row.get('owner', ''),
+                'created': row.get('created_on', ''),
+                'comment': row.get('comment', '')
+            })
+        
+        return make_response(jsonify(databases))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'get_databases_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/schemas')
+def get_schemas():
+    """Get all schemas from Snowflake INFORMATION_SCHEMA"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        database = request.args.get('database')
+        
+        schemas = []
+        
+        if database:
+            # Get schemas for specific database
+            try:
+                result = s.sql(f"""
+                    SELECT 
+                        SCHEMA_NAME,
+                        SCHEMA_OWNER,
+                        CREATED
+                    FROM {database}.INFORMATION_SCHEMA.SCHEMATA
+                    ORDER BY SCHEMA_NAME
+                """).collect()
+                
+                for row in result:
+                    schemas.append({
+                        'id': row['SCHEMA_NAME'],
+                        'name': row['SCHEMA_NAME'],
+                        'schema_name': row['SCHEMA_NAME'],
+                        'database_name': database,
+                        'databaseId': database,
+                        'owner': row.get('SCHEMA_OWNER', ''),
+                        'created': row.get('CREATED', '')
+                    })
+            except Exception as e:
+                # Fallback to SHOW SCHEMAS
+                s.sql(f"SHOW SCHEMAS IN DATABASE {database}").collect()
+                result = s.sql("SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()
+                
+                for row in result:
+                    schemas.append({
+                        'id': row['name'],
+                        'name': row['name'],
+                        'schema_name': row['name'],
+                        'database_name': database,
+                        'databaseId': database,
+                        'owner': row.get('owner', ''),
+                        'created': row.get('created_on', '')
+                    })
+        else:
+            # Get all schemas using ACCOUNT_USAGE if available
+            use_account_usage = os.getenv('USE_ACCOUNT_USAGE', '1') in ('1', 'true', 'True')
+            
+            if use_account_usage:
+                try:
+                    result = s.sql("""
+                        SELECT 
+                            DATABASE_NAME,
+                            SCHEMA_NAME,
+                            SCHEMA_OWNER,
+                            CREATED
+                        FROM SNOWFLAKE.ACCOUNT_USAGE.SCHEMATA
+                        WHERE DELETED IS NULL
+                        ORDER BY DATABASE_NAME, SCHEMA_NAME
+                    """).collect()
+                    
+                    for row in result:
+                        schemas.append({
+                            'id': f"{row['DATABASE_NAME']}.{row['SCHEMA_NAME']}",
+                            'name': row['SCHEMA_NAME'],
+                            'schema_name': row['SCHEMA_NAME'],
+                            'database_name': row['DATABASE_NAME'],
+                            'databaseId': row['DATABASE_NAME'],
+                            'owner': row.get('SCHEMA_OWNER', ''),
+                            'created': row.get('CREATED', '')
+                        })
+                except Exception as e:
+                    # Could not use ACCOUNT_USAGE, return empty for now
+                    pass
+        
+        return make_response(jsonify(schemas))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'get_schemas_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/tables')  
+def get_tables():
+    """Get all tables from Snowflake INFORMATION_SCHEMA"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        database = request.args.get('database')
+        schema = request.args.get('schema')
+        
+        tables = []
+        
+        if database and schema:
+            # Get tables for specific database.schema
+            try:
+                result = s.sql(f"""
+                    SELECT 
+                        TABLE_NAME,
+                        TABLE_TYPE,
+                        ROW_COUNT,
+                        BYTES,
+                        CREATED,
+                        COMMENT
+                    FROM {database}.INFORMATION_SCHEMA.TABLES
+                    WHERE TABLE_SCHEMA = '{schema}'
+                    ORDER BY TABLE_NAME
+                """).collect()
+                
+                for row in result:
+                    tables.append({
+                        'id': f"{database}.{schema}.{row['TABLE_NAME']}",
+                        'name': row['TABLE_NAME'],
+                        'table_name': row['TABLE_NAME'],
+                        'database_name': database,
+                        'schema_name': schema,
+                        'databaseId': database,
+                        'schemaId': schema,
+                        'tableType': row.get('TABLE_TYPE', 'BASE TABLE'),
+                        'rowCount': row.get('ROW_COUNT', 0),
+                        'bytes': row.get('BYTES', 0),
+                        'created': row.get('CREATED', ''),
+                        'description': row.get('COMMENT', ''),
+                        'columns': []
+                    })
+            except Exception as e:
+                # Fallback to SHOW TABLES
+                s.sql(f"SHOW TABLES IN SCHEMA {database}.{schema}").collect()
+                result = s.sql("SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()
+                
+                for row in result:
+                    tables.append({
+                        'id': f"{database}.{schema}.{row['name']}",
+                        'name': row['name'],
+                        'table_name': row['name'],
+                        'database_name': database,
+                        'schema_name': schema,
+                        'databaseId': database,
+                        'schemaId': schema,
+                        'tableType': row.get('kind', 'TABLE'),
+                        'rowCount': row.get('rows', 0),
+                        'bytes': row.get('bytes', 0),
+                        'created': row.get('created_on', ''),
+                        'description': row.get('comment', ''),
+                        'columns': []
+                    })
+        elif database:
+            # Get all tables in database across all schemas  
+            try:
+                result = s.sql(f"""
+                    SELECT 
+                        TABLE_SCHEMA,
+                        TABLE_NAME,
+                        TABLE_TYPE,
+                        ROW_COUNT,
+                        BYTES,
+                        CREATED,
+                        COMMENT
+                    FROM {database}.INFORMATION_SCHEMA.TABLES
+                    ORDER BY TABLE_SCHEMA, TABLE_NAME
+                """).collect()
+                
+                for row in result:
+                    tables.append({
+                        'id': f"{database}.{row['TABLE_SCHEMA']}.{row['TABLE_NAME']}",
+                        'name': row['TABLE_NAME'],
+                        'table_name': row['TABLE_NAME'],
+                        'database_name': database,
+                        'schema_name': row['TABLE_SCHEMA'],
+                        'databaseId': database,
+                        'schemaId': row['TABLE_SCHEMA'],
+                        'tableType': row.get('TABLE_TYPE', 'BASE TABLE'),
+                        'rowCount': row.get('ROW_COUNT', 0),
+                        'bytes': row.get('BYTES', 0),
+                        'created': row.get('CREATED', ''),
+                        'description': row.get('COMMENT', ''),
+                        'columns': []
+                    })
+            except Exception as e:
+                # Could not query specific database
+                pass
+        else:
+            # Get all tables using ACCOUNT_USAGE if available
+            use_account_usage = os.getenv('USE_ACCOUNT_USAGE', '1') in ('1', 'true', 'True')
+            
+            if use_account_usage:
+                try:
+                    result = s.sql("""
+                        SELECT 
+                            TABLE_CATALOG,
+                            TABLE_SCHEMA,
+                            TABLE_NAME,
+                            TABLE_TYPE,
+                            ROW_COUNT,
+                            BYTES,
+                            CREATED,
+                            COMMENT
+                        FROM SNOWFLAKE.ACCOUNT_USAGE.TABLES
+                        WHERE DELETED IS NULL
+                        ORDER BY TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME
+                        LIMIT 1000
+                    """).collect()
+                    
+                    for row in result:
+                        tables.append({
+                            'id': f"{row['TABLE_CATALOG']}.{row['TABLE_SCHEMA']}.{row['TABLE_NAME']}",
+                            'name': row['TABLE_NAME'],
+                            'table_name': row['TABLE_NAME'],
+                            'database_name': row['TABLE_CATALOG'],
+                            'schema_name': row['TABLE_SCHEMA'],
+                            'databaseId': row['TABLE_CATALOG'],
+                            'schemaId': row['TABLE_SCHEMA'],
+                            'tableType': row.get('TABLE_TYPE', 'BASE TABLE'),
+                            'rowCount': row.get('ROW_COUNT', 0),
+                            'bytes': row.get('BYTES', 0),
+                            'created': row.get('CREATED', ''),
+                            'description': row.get('COMMENT', ''),
+                            'columns': []
+                        })
+                except Exception as e:
+                    # Could not use ACCOUNT_USAGE
+                    pass
+        
+        return make_response(jsonify(tables))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'get_tables_failed: {str(e)}'}), 500)
+
+
+@snowpark.route('/tables/<table_id>/columns')
+def get_table_columns(table_id):
+    """Get columns for a specific table"""
+    try:
+        s = get_session()
+        if s is None:
+            return make_response(jsonify({'error': 'no_session'}))
+        
+        # Parse table_id (format: database.schema.table)
+        parts = table_id.split('.')
+        if len(parts) != 3:
+            return make_response(jsonify({'error': 'Invalid table_id format. Expected: database.schema.table'}), 400)
+        
+        database, schema, table = parts
+        columns = []
+        
+        try:
+            # Get columns from INFORMATION_SCHEMA
+            result = s.sql(f"""
+                SELECT 
+                    COLUMN_NAME,
+                    DATA_TYPE,
+                    IS_NULLABLE,
+                    COLUMN_DEFAULT,
+                    COMMENT,
+                    ORDINAL_POSITION
+                FROM {database}.INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = '{schema}' 
+                  AND TABLE_NAME = '{table}'
+                ORDER BY ORDINAL_POSITION
+            """).collect()
+            
+            for row in result:
+                columns.append({
+                    'id': f"{table_id}.{row['COLUMN_NAME']}",
+                    'name': row['COLUMN_NAME'],
+                    'column_name': row['COLUMN_NAME'],
+                    'dataType': row['DATA_TYPE'],
+                    'data_type': row['DATA_TYPE'],
+                    'isNullable': row['IS_NULLABLE'] == 'YES',
+                    'defaultValue': row.get('COLUMN_DEFAULT'),
+                    'description': row.get('COMMENT', ''),
+                    'ordinalPosition': row.get('ORDINAL_POSITION', 0),
+                    'isPrimaryKey': False,  # Would need additional query for PK info
+                    'table_id': table_id,
+                    'table_name': table,
+                    'database_name': database,
+                    'schema_name': schema
+                })
+                
+        except Exception as e:
+            # Fallback to DESCRIBE TABLE  
+            try:
+                s.sql(f"DESCRIBE TABLE {database}.{schema}.{table}").collect()
+                result = s.sql("SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))").collect()
+                
+                for idx, row in enumerate(result):
+                    columns.append({
+                        'id': f"{table_id}.{row['name']}",
+                        'name': row['name'],
+                        'column_name': row['name'],
+                        'dataType': row.get('type', ''),
+                        'data_type': row.get('type', ''),
+                        'isNullable': row.get('null?') == 'Y',
+                        'defaultValue': row.get('default'),
+                        'description': row.get('comment', ''),
+                        'ordinalPosition': idx + 1,
+                        'isPrimaryKey': row.get('primary key') == 'Y',
+                        'table_id': table_id,
+                        'table_name': table,
+                        'database_name': database,
+                        'schema_name': schema
+                    })
+            except Exception as e2:
+                return make_response(jsonify({'error': f'Could not get columns: {str(e2)}'}), 500)
+        
+        return make_response(jsonify(columns))
+        
+    except Exception as e:
+        return make_response(jsonify({'error': f'get_table_columns_failed: {str(e)}'}), 500)

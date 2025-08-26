@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api/snowpark': {
-        target: 'http://localhost:8081',
+        target: `http://localhost:${process.env.BACKEND_PORT || 8081}`,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api\/snowpark/, '/snowpark'),

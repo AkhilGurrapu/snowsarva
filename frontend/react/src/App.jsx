@@ -5,7 +5,7 @@ import DataQualityMonitor from './components/DataQualityMonitor'
 import QueryAdvisor from './components/QueryAdvisor'
 import DatabaseExplorer from './components/DatabaseExplorer'
 import WarehouseManager from './components/WarehouseManager'
-import DataLineage from './components/DataLineage'
+import LineageVisualizerDashboard from './components/LineageVisualizerDashboard'
 import Recommendations from './components/Recommendations'
 import CostDashboard from './components/CostDashboard'
 import Performance from './components/Performance'
@@ -109,7 +109,7 @@ export default function App() {
       case 'warehouses':
         return <WarehouseManager />
       case 'data-lineage':
-        return <DataLineage />
+        return <LineageVisualizerDashboard />
       case 'recommendations':
         return <Recommendations />
       case 'cost-dashboard':
